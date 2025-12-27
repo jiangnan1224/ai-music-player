@@ -1,6 +1,7 @@
 import { Song } from './types';
 
 export const API_BASE_URL = 'https://music-dl.sayqz.com'; // Base URL as requested
+export const USER_API_BASE_URL = 'https://music.jiangnan24.com';
 export const DEFAULT_COVER = 'https://picsum.photos/300/300';
 
 // Mock data to ensure the UI looks good if the API is down or requires specific auth headers not provided

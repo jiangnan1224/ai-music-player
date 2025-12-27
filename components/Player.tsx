@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { fetch } from '@tauri-apps/plugin-http';
 import { Play, Pause, SkipBack, SkipForward, Volume2, Heart, ListMusic, Mic2, Repeat, Repeat1, Shuffle } from 'lucide-react';
 import { Song } from '../types';
 
@@ -43,6 +44,53 @@ export const Player: React.FC<PlayerProps> = ({
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
   const [duration, setDuration] = useState(0);
+  const [audioSrc, setAudioSrc] = useState<string>('');
+
+  // Fetch audio as blob to bypass Referer check
+  useEffect(() => {
+    if (!currentSong) return;
+
+    let isMounted = true;
+    const loadAudio = async () => {
+      try {
+        let referer = 'https://www.google.com/';
+        if (currentSong.audioUrl.includes('qq.com')) referer = 'https://y.qq.com/';
+        else if (currentSong.audioUrl.includes('163.com') || currentSong.audioUrl.includes('netease')) referer = 'https://music.163.com/';
+        else if (currentSong.audioUrl.includes('kuwo.cn')) referer = 'https://kuwo.cn/';
+
+        // Check if running in Tauri (window.__TAURI__ exists or similar check, or just try/catch)
+        // For now, we assume this component runs in Tauri context if fetch is available
+        const response = await fetch(currentSong.audioUrl, {
+          method: 'GET',
+          headers: {
+            'Referer': referer,
+            'User-Agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          }
+        });
+
+        if (!response.ok) throw new Error('Network response was not ok');
+
+        const blob = await response.blob();
+        if (isMounted) {
+          const url = URL.createObjectURL(blob);
+          setAudioSrc(url);
+        }
+      } catch (err) {
+        console.error("Failed to load audio blob", err);
+        // Fallback to direct URL if fetch fails (e.g. not in Tauri or network error)
+        if (isMounted) setAudioSrc(currentSong.audioUrl);
+      }
+    };
+
+    loadAudio();
+
+    return () => {
+      isMounted = false;
+      if (audioSrc && audioSrc.startsWith('blob:')) {
+        URL.revokeObjectURL(audioSrc);
+      }
+    };
+  }, [currentSong]);
 
   // Play/Pause handling with Media Session state
   useEffect(() => {
@@ -240,13 +288,14 @@ export const Player: React.FC<PlayerProps> = ({
     <div className="h-24 bg-black border-t border-gray-900 px-4 flex items-center justify-between sticky bottom-0 z-50">
       <audio
         ref={audioRef}
-        src={currentSong.audioUrl}
+        src={audioSrc}
         onTimeUpdate={handleTimeUpdate}
         onEnded={onNext}
         onError={handleAudioError}
         preload="auto"
         playsInline
         autoPlay={isPlaying}
+        referrerPolicy="no-referrer"
       />
 
       {/* Left: Song Info */}

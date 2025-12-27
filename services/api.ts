@@ -1,6 +1,7 @@
 import { Song, User } from '../types';
 import { API_BASE_URL, MOCK_SONGS, DEFAULT_COVER } from '../constants';
 import { cache, TTL } from '../utils/cache';
+import { fetch } from '@tauri-apps/plugin-http';
 
 // Flag to force mock mode if the real API is unstable or requires specific unknown headers
 const USE_MOCK = false;
@@ -30,7 +31,9 @@ export const api = {
 
     try {
       // Using aggregateSearch to get results from multiple platforms
-      const res = await fetch(`${API_BASE_URL}/api/?type=aggregateSearch&keyword=${encodeURIComponent(query)}&page=${page}`);
+      const url = `${API_BASE_URL}/api/?type=aggregateSearch&keyword=${encodeURIComponent(query)}&page=${page}`;
+      console.log('Fetching Search:', url);
+      const res = await fetch(url);
 
       if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
@@ -61,7 +64,9 @@ export const api = {
 
   getTopLists: async (source: string = 'netease'): Promise<{ id: string, name: string }[]> => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/?source=${source}&type=toplists`);
+      const url = `${API_BASE_URL}/api/?source=${source}&type=toplists`;
+      console.log('Fetching TopLists:', url);
+      const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch toplists');
       const data = await res.json();
       return data.data?.list?.map((l: any) => ({ id: l.id, name: l.name })) || [];
@@ -74,7 +79,9 @@ export const api = {
   getPlaylist: async (source: string, id: string): Promise<Song[]> => {
     return cache.fetchWithCache(`playlist_${source}_${id}`, TTL.PLAYLISTS, async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/?source=${source}&type=playlist&id=${id}`);
+        const url = `${API_BASE_URL}/api/?source=${source}&type=playlist&id=${id}`;
+        console.log('Fetching Playlist:', url);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to fetch playlist');
         const data = await res.json();
 
@@ -98,7 +105,9 @@ export const api = {
   getLyrics: async (source: string, id: string): Promise<string> => {
     return cache.fetchWithCache(`lyrics_${source}_${id}`, TTL.LYRICS, async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/?source=${source}&id=${id}&type=lrc`);
+        const url = `${API_BASE_URL}/api/?source=${source}&id=${id}&type=lrc`;
+        console.log('Fetching Lyrics:', url);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to fetch lyrics');
         const text = await res.text();
         return text;
@@ -112,7 +121,9 @@ export const api = {
   getTopListCategories: async (source: string): Promise<any[]> => {
     return cache.fetchWithCache(`cats_${source}`, TTL.CATEGORIES, async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/?type=toplists&source=${source}`);
+        const url = `${API_BASE_URL}/api/?type=toplists&source=${source}`;
+        console.log('Fetching TopList Categories:', url);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to fetch toplist categories');
         const data = await res.json();
         return data.data.list || [];
@@ -127,7 +138,9 @@ export const api = {
     return cache.fetchWithCache(`toplist_${source}_${id}`, TTL.PLAYLISTS, async () => {
       try {
         // Toplists use type=toplist, not type=playlist
-        const res = await fetch(`${API_BASE_URL}/api/?source=${source}&type=toplist&id=${id}`);
+        const url = `${API_BASE_URL}/api/?source=${source}&type=toplist&id=${id}`;
+        console.log('Fetching TopList Songs:', url);
+        const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to fetch toplist songs');
         const data = await res.json();
 

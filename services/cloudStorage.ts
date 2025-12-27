@@ -1,6 +1,8 @@
 import { Playlist, User } from '../types';
+import { USER_API_BASE_URL } from '../constants';
+import { fetch } from '@tauri-apps/plugin-http';
 
-const API_BASE = '/api';
+const API_BASE = `${USER_API_BASE_URL}/api`;
 
 // Helper to get headers with Auth
 const getHeaders = () => {
@@ -15,7 +17,9 @@ const getHeaders = () => {
 export const cloudService = {
     auth: {
         login: async (username: string, password: string): Promise<User> => {
-            const res = await fetch(`${API_BASE}/auth/login`, {
+            const url = `${API_BASE}/auth/login`;
+            console.log('Fetching Login:', url);
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -28,7 +32,9 @@ export const cloudService = {
         },
 
         register: async (username: string, password: string): Promise<User> => {
-            const res = await fetch(`${API_BASE}/auth/register`, {
+            const url = `${API_BASE}/auth/register`;
+            console.log('Fetching Register:', url);
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -43,7 +49,9 @@ export const cloudService = {
 
     playlists: {
         list: async (): Promise<Playlist[]> => {
-            const res = await fetch(`${API_BASE}/playlists`, { headers: getHeaders() });
+            const url = `${API_BASE}/playlists`;
+            console.log('Fetching Playlists:', url);
+            const res = await fetch(url, { headers: getHeaders() });
             if (!res.ok) throw new Error('Failed to fetch playlists');
             return res.json();
         },
