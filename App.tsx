@@ -265,7 +265,12 @@ const App = () => {
   const loadPlaylists = async () => {
     try {
       const list = await cloudService.playlists.list();
-      setPlaylists(list);
+      // Rehydrate songs with audio URLs
+      const rehydratedList = list.map(p => ({
+        ...p,
+        songs: rehydrateSongs(p.songs)
+      }));
+      setPlaylists(rehydratedList);
     } catch (e) {
       console.error("Failed to load playlists", e);
     }
@@ -491,10 +496,12 @@ const App = () => {
 
     try {
       // Backend create
-      // Note: backend create expects the full object logic we defined in service? 
-      // Actually service.create takes Playlist object.
-      // We should match backend expectation. 
-      await cloudService.playlists.create(newPlaylist);
+      // Sanitize songs to reduce payload size
+      const payload = {
+        ...newPlaylist,
+        songs: sanitizeSongsForStorage(newPlaylist.songs)
+      };
+      await cloudService.playlists.create(payload);
       // Reload to ensure sync
       loadPlaylists();
       return newPlaylist;
@@ -528,7 +535,11 @@ const App = () => {
     setPlaylists(prev => prev.map(p => p.id === playlistId ? updated : p));
 
     try {
-      await cloudService.playlists.update(updated);
+      const payload = {
+        ...updated,
+        songs: sanitizeSongsForStorage(updated.songs)
+      };
+      await cloudService.playlists.update(payload);
     } catch (e) {
       console.error(e);
       loadPlaylists();
@@ -553,7 +564,11 @@ const App = () => {
     setPlaylists(prev => prev.map(p => p.id === playlistId ? updated : p));
 
     try {
-      await cloudService.playlists.update(updated);
+      const payload = {
+        ...updated,
+        songs: sanitizeSongsForStorage(updated.songs)
+      };
+      await cloudService.playlists.update(payload);
     } catch (e) {
       console.error(e);
       loadPlaylists();
@@ -573,7 +588,11 @@ const App = () => {
     setPlaylists(prev => prev.map(p => p.id === playlistId ? updated : p));
 
     try {
-      await cloudService.playlists.update(updated);
+      const payload = {
+        ...updated,
+        songs: sanitizeSongsForStorage(updated.songs)
+      };
+      await cloudService.playlists.update(payload);
     } catch (e) {
       console.error(e);
       loadPlaylists();
