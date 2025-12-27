@@ -22,7 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile, 
     <div className={`w-64 bg-black h-full flex flex-col pt-2 pb-6 ${mobile ? '' : 'hidden md:flex p-6 border-r border-gray-900'}`}>
       {!mobile && (
         <div className="flex items-center gap-2 mb-10 px-2 text-white">
-          <Disc size={40} className="text-white" />
+          <img src="/icon.png" alt="TuneStream" className="w-10 h-10" />
           <h1 className="text-2xl font-bold tracking-tighter">TuneStream</h1>
         </div>
       )}

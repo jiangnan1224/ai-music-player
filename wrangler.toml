@@ -1,0 +1,8 @@
+name = "tunestream"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tunestream-db"
+database_id = "Put-Your-D1-Database-ID-Here" # User will need to replace this after creating DB on dashboard or CLI

@@ -4,6 +4,7 @@ import { Player } from './components/Player';
 import { SongCard } from './components/SongCard';
 import { Button } from './components/Button';
 import { api } from './services/api';
+import { cloudService } from './services/cloudStorage';
 import { getMusicRecommendation } from './services/geminiService';
 import { Song, User, ViewState, TopListCategory, Playlist } from './types';
 import { Search, Loader2, Sparkles, LogIn, Disc, LayoutGrid, List, Clock, Heart, Play, Menu, X, Repeat, Repeat1, Shuffle, ChevronLeft } from 'lucide-react';
@@ -21,56 +22,83 @@ const HARDCODED_PASSWORD = 'jiangnan';
 
 // Login Component
 const LoginScreen = ({ onLogin }: { onLogin: (u: string) => void }) => {
+  const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!username.trim()) {
-      setError('请输入用户名');
+    if (!username.trim() || !password) {
+      setError('Please enter username and password');
       return;
     }
 
-    if (!password) {
-      setError('请输入密码');
-      return;
+    setLoading(true);
+    setError('');
+
+    try {
+      let user;
+      if (isRegistering) {
+        user = await cloudService.auth.register(username.trim(), password);
+        // Auto login after register? Or just notify?
+        // Let's notify success and switch to login or just auto login.
+        // The API returns the user object, so we can consider them logged in.
+      } else {
+        user = await cloudService.auth.login(username.trim(), password);
+      }
+
+      // Save to localStorage
+      localStorage.setItem('tunestream_user', JSON.stringify(user));
+      onLogin(user.username);
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+    } finally {
+      setLoading(false);
     }
-
-    if (password !== HARDCODED_PASSWORD) {
-      setError('密码错误');
-      return;
-    }
-
-    // Save to localStorage
-    const user = { id: '1', username: username.trim() };
-    localStorage.setItem('tunestream_user', JSON.stringify(user));
-
-    onLogin(username.trim());
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="bg-black/40 backdrop-blur-xl p-8 rounded-2xl border border-white/10 w-full max-w-md">
         <div className="flex items-center justify-center mb-8">
-          <Disc size={48} className="text-spotGreen mr-3" />
+          <img src="/logo.png" alt="TuneStream" className="w-12 h-12 mr-3" />
           <h1 className="text-4xl font-bold text-white">TuneStream</h1>
         </div>
 
+        <div className="flex justify-center mb-6">
+          <div className="bg-white/10 p-1 rounded-full flex">
+            <button
+              type="button"
+              onClick={() => { setIsRegistering(false); setError(''); }}
+              className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${!isRegistering ? 'bg-white text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={() => { setIsRegistering(true); setError(''); }}
+              className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${isRegistering ? 'bg-white text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              Register
+            </button>
+          </div>
+        </div>
+
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm animate-pulse">
             {error}
           </div>
         )}
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">用户名</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
             <input
               type="text"
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 outline-none focus:bg-white/20 transition-all"
-              placeholder="输入你的名字"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 outline-none focus:bg-white/20 transition-all focus:border-spotGreen/50"
+              placeholder="Enter your username"
               value={username}
               onChange={(e) => { setUsername(e.target.value); setError(''); }}
               autoFocus
@@ -78,11 +106,11 @@ const LoginScreen = ({ onLogin }: { onLogin: (u: string) => void }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">密码</label>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
             <input
               type="password"
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 outline-none focus:bg-white/20 transition-all"
-              placeholder="输入密码"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 outline-none focus:bg-white/20 transition-all focus:border-spotGreen/50"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(''); }}
             />
@@ -90,9 +118,10 @@ const LoginScreen = ({ onLogin }: { onLogin: (u: string) => void }) => {
 
           <button
             type="submit"
-            className="w-full bg-spotGreen hover:bg-spotGreen/90 text-black font-bold py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+            disabled={loading}
+            className="w-full bg-spotGreen hover:bg-spotGreen/90 disabled:bg-gray-600 disabled:text-gray-400 text-black font-bold py-3 rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center"
           >
-            登录
+            {loading ? <Loader2 className="animate-spin" /> : (isRegistering ? 'Create Account' : 'Log In')}
           </button>
         </div>
       </form>
@@ -130,10 +159,7 @@ const App = () => {
     const saved = localStorage.getItem('tunestream_library');
     return saved ? JSON.parse(saved) : [];
   });
-  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
-    const saved = localStorage.getItem('tunestream_playlists');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   // Dashboard State
   const [homeData, setHomeData] = useState<Record<string, { list: any, songs: Song[] }>>({});
@@ -193,9 +219,26 @@ const App = () => {
     localStorage.setItem('tunestream_queue', JSON.stringify(queue));
   }, [queue]);
 
+  // Removed localStorage persistence for playlists as we sync to cloud now
+  // useEffect(() => {
+  //   localStorage.setItem('tunestream_playlists', JSON.stringify(playlists));
+  // }, [playlists]);
+
+  // Load playlists from Cloud
   useEffect(() => {
-    localStorage.setItem('tunestream_playlists', JSON.stringify(playlists));
-  }, [playlists]);
+    if (user) {
+      loadPlaylists();
+    }
+  }, [user]);
+
+  const loadPlaylists = async () => {
+    try {
+      const list = await cloudService.playlists.list();
+      setPlaylists(list);
+    } catch (e) {
+      console.error("Failed to load playlists", e);
+    }
+  };
 
   // Initial Load (Get some default songs)
   useEffect(() => {
@@ -401,56 +444,107 @@ const App = () => {
   };
 
   // Playlist Management Functions
-  const createPlaylist = (name: string, description?: string) => {
+  const createPlaylist = async (name: string, description?: string) => {
     const newPlaylist: Playlist = {
-      id: `playlist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(), // Temp ID for optimistic, backend might assign real one if we let it
       name,
-      description,
+      description: description || '',
       songs: [],
-      coverUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}&backgroundColor=121212`, // Dark theme background
+      coverUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}&backgroundColor=121212`,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
-    setPlaylists([...playlists, newPlaylist]);
+
+    // Optimistic update
+    setPlaylists(prev => [...prev, newPlaylist]);
+
+    try {
+      // Backend create
+      // Note: backend create expects the full object logic we defined in service? 
+      // Actually service.create takes Playlist object.
+      // We should match backend expectation. 
+      await cloudService.playlists.create(newPlaylist);
+      // Reload to ensure sync
+      loadPlaylists();
+    } catch (e) {
+      console.error(e);
+      // Revert if failed? For now simpler to just log
+    }
+
     return newPlaylist;
   };
 
-  const deletePlaylist = (playlistId: string) => {
-    setPlaylists(playlists.filter(p => p.id !== playlistId));
+  const deletePlaylist = async (playlistId: string) => {
+    // Optimistic
+    setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+    try {
+      await cloudService.playlists.delete(playlistId);
+    } catch (e) {
+      console.error(e);
+      loadPlaylists(); // Revert/Sync on error
+    }
   };
 
-  const renamePlaylist = (playlistId: string, newName: string, newDescription?: string) => {
-    setPlaylists(playlists.map(p =>
-      p.id === playlistId
-        ? { ...p, name: newName, description: newDescription, updatedAt: Date.now() }
-        : p
-    ));
+  const renamePlaylist = async (playlistId: string, newName: string, newDescription?: string) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) return;
+
+    const updated = { ...playlist, name: newName, description: newDescription, updatedAt: Date.now() };
+
+    // Optimistic
+    setPlaylists(prev => prev.map(p => p.id === playlistId ? updated : p));
+
+    try {
+      await cloudService.playlists.update(updated);
+    } catch (e) {
+      console.error(e);
+      loadPlaylists();
+    }
   };
 
-  const addSongToPlaylist = (playlistId: string, song: Song) => {
-    setPlaylists(playlists.map(p => {
-      if (p.id === playlistId) {
-        // If it's the first song being added, or if the current cover is a generated one, update it to the song's cover
-        const isGenerated = !p.coverUrl || p.coverUrl.includes('api.dicebear.com');
-        const shouldUpdateCover = p.songs.length === 0 && isGenerated;
+  const addSongToPlaylist = async (playlistId: string, song: Song) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) return;
 
-        return {
-          ...p,
-          songs: [...p.songs, song],
-          coverUrl: shouldUpdateCover ? song.coverUrl : p.coverUrl,
-          updatedAt: Date.now()
-        };
-      }
-      return p;
-    }));
+    // Check header/cover update logic
+    const isGenerated = !playlist.coverUrl || playlist.coverUrl.includes('api.dicebear.com');
+    const shouldUpdateCover = playlist.songs.length === 0 && isGenerated;
+
+    const updated: Playlist = {
+      ...playlist,
+      songs: [...playlist.songs, song],
+      coverUrl: shouldUpdateCover ? song.coverUrl : playlist.coverUrl,
+      updatedAt: Date.now()
+    };
+
+    setPlaylists(prev => prev.map(p => p.id === playlistId ? updated : p));
+
+    try {
+      await cloudService.playlists.update(updated);
+    } catch (e) {
+      console.error(e);
+      loadPlaylists();
+    }
   };
 
-  const removeSongFromPlaylist = (playlistId: string, songId: string | number) => {
-    setPlaylists(playlists.map(p =>
-      p.id === playlistId
-        ? { ...p, songs: p.songs.filter(s => s.id !== songId), updatedAt: Date.now() }
-        : p
-    ));
+  const removeSongFromPlaylist = async (playlistId: string, songId: string | number) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) return;
+
+    const updated: Playlist = {
+      ...playlist,
+      songs: playlist.songs.filter(s => s.id !== songId),
+      updatedAt: Date.now()
+    };
+
+    setPlaylists(prev => prev.map(p => p.id === playlistId ? updated : p));
+
+    try {
+      await cloudService.playlists.update(updated);
+    } catch (e) {
+      console.error(e);
+      loadPlaylists();
+    }
   };
 
   const handleLogout = () => {
@@ -501,7 +595,7 @@ const App = () => {
           >
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-2 text-white">
-                <Disc size={32} />
+                <img src="/icon.png" alt="TuneStream" className="w-8 h-8" />
                 <span className="text-xl font-bold">TuneStream</span>
               </div>
               <button onClick={() => setShowMobileSidebar(false)} className="text-gray-400 hover:text-white">
