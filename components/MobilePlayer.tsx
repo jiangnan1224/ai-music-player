@@ -20,6 +20,8 @@ interface MobilePlayerProps {
     toggleFavorite: () => void;
     playbackMode: 'loop' | 'shuffle' | 'repeat-one';
     togglePlaybackMode: () => void;
+    queue: Song[];
+    onPlay: (song: Song) => void;
 }
 
 export const MobilePlayer: React.FC<MobilePlayerProps> = ({
@@ -117,34 +119,9 @@ export const MobilePlayer: React.FC<MobilePlayerProps> = ({
                 >
                     {/* PAGE 1: PLAYER (Vinyl) - Width 50% */}
                     <div className="w-[50%] h-full flex-shrink-0 flex flex-col px-8 pb-12">
-                        <div className="flex-1 relative flex items-center justify-center overflow-hidden pt-12">
-                            {/* Stylus Arm Container - Anchored to Top Right */}
-                            {/* Pivot Point */}
-                            <div className="absolute top-4 right-10 w-12 h-12 z-30 flex items-center justify-center">
-                                <div className="w-8 h-8 rounded-full bg-gray-300 shadow-xl border-2 border-gray-400" />
-                                <div className="absolute w-2 h-2 rounded-full bg-gray-500" />
-                            </div>
-
-                            {/* The Arm Itself */}
-                            <div className={`absolute top-8 right-14 w-24 h-64 z-20 transition-transform duration-700 origin-top-right ease-out
-                        ${isPlaying ? 'rotate-[20deg]' : 'rotate-[-25deg]'}`}>
-                                {/* Main Arm Shaft */}
-                                <div className="w-2 h-48 bg-gradient-to-b from-gray-300 to-gray-400 absolute right-2 top-0 rounded-full shadow-lg" />
-
-                                {/* Counterweight (Visual only at top) */}
-                                <div className="w-6 h-8 bg-gray-500 rounded absolute -top-2 -right-1 shadow-md" />
-
-                                {/* Angled Head Shell Holder */}
-                                <div className="absolute bottom-16 left-0 w-8 h-2 bg-gray-400 rotate-45 origin-right rounded-full" />
-
-                                {/* Cartridge/Head */}
-                                <div className="absolute bottom-12 -left-4 w-8 h-12 bg-gray-800 rounded-sm shadow-md border border-gray-600 rotate-12 flex flex-col items-center justify-end pb-1">
-                                    <div className="w-1 h-2 bg-white/50 rounded-full" />
-                                </div>
-                            </div>
-
-                            {/* Vinyl Record */}
-                            <div className={`w-[80vw] h-[80vw] max-w-[320px] max-h-[320px] rounded-full bg-[#101010] border-4 border-[#1a1a1a] shadow-2xl flex items-center justify-center relative
+                        <div className="flex-1 relative flex items-center justify-center overflow-hidden py-4">
+                            {/* Vinyl Record - Responsive sizing */}
+                            <div className={`aspect-square w-[75vw] max-w-[320px] max-h-[45vh] rounded-full bg-[#101010] border-4 border-[#1a1a1a] shadow-2xl flex items-center justify-center relative
                         ${isPlaying ? 'animate-spin-slow' : ''}`}
                                 style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
                             >
