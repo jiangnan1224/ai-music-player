@@ -154,7 +154,8 @@ export const PlaylistDetail: React.FC<PlaylistDetailProps> = ({
                             {playlist.songs.map((song, index) => (
                                 <div
                                     key={`${song.id}-${playlist.id}-${index}`}
-                                    className="flex items-center p-2 rounded-md hover:bg-white/10 group transition-colors text-sm text-gray-400 group-hover:text-white"
+                                    onClick={() => onPlay(song, playlist.songs)}
+                                    className="flex items-center p-2 rounded-md hover:bg-white/10 group transition-colors text-sm text-gray-400 group-hover:text-white cursor-pointer"
                                 >
                                     <div className="w-8 md:w-12 text-center flex items-center justify-center relative hidden md:flex">
                                         <span className="group-hover:hidden text-gray-500 font-medium">{index + 1}</span>

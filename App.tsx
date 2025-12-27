@@ -16,6 +16,7 @@ import { PlaylistDetail } from './components/PlaylistDetail';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { ImportPlaylistModal } from './components/ImportPlaylistModal';
 import { MobilePlayer } from './components/MobilePlayer';
+import { HomeSkeleton, GridSkeleton } from './components/LoadingSkeleton';
 
 // Hardcoded password
 const HARDCODED_PASSWORD = 'jiangnan';
@@ -773,83 +774,95 @@ const App = () => {
               ) : (
                 <>
                   {view === ViewState.HOME && (
-                    <div className="space-y-12">
-                      {['netease', 'qq', 'kuwo'].map(sourceKey => {
-                        const section = homeData[sourceKey];
-                        if (!section) return null;
+                    <>
+                      {isLoading && Object.keys(homeData).length === 0 ? (
+                        <HomeSkeleton />
+                      ) : (
+                        <div className="space-y-12">
+                          {['netease', 'qq', 'kuwo'].map(sourceKey => {
+                            const section = homeData[sourceKey];
+                            if (!section) return null;
 
-                        return (
-                          <div key={sourceKey}>
-                            <div className="flex flex-col gap-4 mb-6">
-                              <div className="flex justify-between items-end border-b border-white/10 pb-4">
-                                <h3 className="text-2xl font-bold capitalize">
-                                  {sourceKey === 'netease' ? '网易云音乐' : sourceKey === 'qq' ? 'QQ音乐' : '酷我音乐'}
-                                </h3>
-                                <button
-                                  onClick={() => handleSeeAll(sourceKey, activeCategory[sourceKey], categories[sourceKey]?.find(c => c.id === activeCategory[sourceKey])?.name || 'Top List')}
-                                  className="text-sm font-bold text-gray-400 hover:text-white hover:underline uppercase tracking-widest"
-                                >
-                                  See All
-                                </button>
-                              </div>
+                            return (
+                              <div key={sourceKey}>
+                                <div className="flex flex-col gap-4 mb-6">
+                                  <div className="flex justify-between items-end border-b border-white/10 pb-4">
+                                    <h3 className="text-2xl font-bold capitalize">
+                                      {sourceKey === 'netease' ? '网易云音乐' : sourceKey === 'qq' ? 'QQ音乐' : '酷我音乐'}
+                                    </h3>
+                                    <button
+                                      onClick={() => handleSeeAll(sourceKey, activeCategory[sourceKey], categories[sourceKey]?.find(c => c.id === activeCategory[sourceKey])?.name || 'Top List')}
+                                      className="text-sm font-bold text-gray-400 hover:text-white hover:underline uppercase tracking-widest"
+                                    >
+                                      See All
+                                    </button>
+                                  </div>
 
-                              {/* Category Chips */}
-                              <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-                                {categories[sourceKey]?.map(cat => (
-                                  <button
-                                    key={cat.id}
-                                    onClick={() => handleCategorySelect(sourceKey, cat.id, cat.name)}
-                                    className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors
-                                            ${activeCategory[sourceKey] === cat.id
-                                        ? 'bg-white text-black'
-                                        : 'bg-white/10 text-white hover:bg-white/20'}`}
-                                  >
-                                    {cat.name}
-                                  </button>
-                                ))}
+                                  {/* Category Chips */}
+                                  <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                                    {categories[sourceKey]?.map(cat => (
+                                      <button
+                                        key={cat.id}
+                                        onClick={() => handleCategorySelect(sourceKey, cat.id, cat.name)}
+                                        className={`px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap transition-colors
+                                                ${activeCategory[sourceKey] === cat.id
+                                            ? 'bg-white text-black'
+                                            : 'bg-white/10 text-white hover:bg-white/20'}`}
+                                      >
+                                        {cat.name}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                                  {section.songs.map(song => (
+                                    <SongCard
+                                      key={song.id}
+                                      song={song}
+                                      onPlay={(s) => handleHomeSongPlay(s, sourceKey, section.list.id)}
+                                      isCurrent={currentSong?.id === song.id}
+                                      isPlaying={isPlaying && currentSong?.id === song.id}
+                                      isFavorite={!!library.find(s => s.id === song.id)}
+                                      onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
+                                      onAddToPlaylist={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedSongToAdd(song);
+                                      }}
+                                    />
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                              {section.songs.map(song => (
-                                <SongCard
-                                  key={song.id}
-                                  song={song}
-                                  onPlay={(s) => handleHomeSongPlay(s, sourceKey, section.list.id)}
-                                  isCurrent={currentSong?.id === song.id}
-                                  isPlaying={isPlaying && currentSong?.id === song.id}
-                                  isFavorite={!!library.find(s => s.id === song.id)}
-                                  onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
-                                  onAddToPlaylist={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedSongToAdd(song);
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {(view === ViewState.LIBRARY || view === ViewState.SEARCH || view === ViewState.TOP_LIST) && (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                      {songs.map(song => (
-                        <SongCard
-                          key={song.id}
-                          song={song}
-                          onPlay={(s) => playSong(s, songs)}
-                          isCurrent={currentSong?.id === song.id}
-                          isPlaying={isPlaying && currentSong?.id === song.id}
-                          isFavorite={!!library.find(s => s.id === song.id)}
-                          onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
-                          onAddToPlaylist={(e) => {
-                            e.stopPropagation();
-                            setSelectedSongToAdd(song);
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <>
+                      {isLoading && songs.length === 0 ? (
+                        <GridSkeleton count={view === ViewState.SEARCH ? 10 : 20} />
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                          {songs.map(song => (
+                            <SongCard
+                              key={song.id}
+                              song={song}
+                              onPlay={(s) => playSong(s, songs)}
+                              isCurrent={currentSong?.id === song.id}
+                              isPlaying={isPlaying && currentSong?.id === song.id}
+                              isFavorite={!!library.find(s => s.id === song.id)}
+                              onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
+                              onAddToPlaylist={(e) => {
+                                e.stopPropagation();
+                                setSelectedSongToAdd(song);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {view === ViewState.SEARCH && songs.length === 0 && !isLoading && (
