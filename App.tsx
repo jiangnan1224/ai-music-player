@@ -204,28 +204,37 @@ const App = () => {
   // Handle Mobile Player State via Hash (Robust Back Button Support)
   useEffect(() => {
     const handleHashChange = () => {
+      // If hash is #player, open it
       const isPlayerOpen = window.location.hash === '#player';
       setShowMobilePlayer(isPlayerOpen);
     };
 
-    // Initial check
+    // Initial check on mount
     handleHashChange();
 
-    // Listen for hash changes (Back button, manual hash set)
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   const openMobilePlayer = () => {
-    window.location.hash = 'player';
+    // Check if already open to avoid duplicate push
+    if (window.location.hash !== '#player') {
+      window.history.pushState(null, '', '#player');
+      // We also need to manually trigger the state update because pushState doesn't fire hashchange event automatically
+      // EXCEPT when we change hash? Actually changing hash via location triggers it?
+      // window.location.hash triggers hashchange.
+      // pushState does NOT trigger hashchange.
+      // So let's stick to window.location.hash but ensure we are not already there.
+      // OR better, use pushState and manually set state.
+      // Actually standard way: location.hash = 'player' works best for catching 'Back'.
+      window.location.hash = 'player';
+    }
   };
 
   const closeMobilePlayer = () => {
-    // Only go back if we are actually in the player hash state
     if (window.location.hash === '#player') {
       window.history.back();
     } else {
-      // Fallback for edge cases
       setShowMobilePlayer(false);
     }
   };
