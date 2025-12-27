@@ -13,6 +13,7 @@ import { UserDropdown } from './components/UserDropdown';
 import { CreatePlaylistModal } from './components/CreatePlaylistModal';
 import { PlaylistDetail } from './components/PlaylistDetail';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
+import { ImportPlaylistModal } from './components/ImportPlaylistModal';
 import { MobilePlayer } from './components/MobilePlayer';
 
 // Hardcoded password
@@ -149,6 +150,7 @@ const App = () => {
 
   // Playlist UI State
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [showImportPlaylist, setShowImportPlaylist] = useState(false);
   const [selectedSongToAdd, setSelectedSongToAdd] = useState<Song | null>(null);
 
   const [currentTime, setCurrentTime] = useState(0);
@@ -478,6 +480,7 @@ const App = () => {
             }}
             playlists={playlists}
             onCreatePlaylist={() => setShowCreatePlaylist(true)}
+            onImportPlaylist={() => setShowImportPlaylist(true)}
             onSelectPlaylist={(playlist) => {
               setSelectedPlaylist(playlist);
               setView(ViewState.PLAYLIST_DETAIL);
@@ -521,6 +524,7 @@ const App = () => {
               mobile
               playlists={playlists}
               onCreatePlaylist={() => setShowCreatePlaylist(true)}
+              onImportPlaylist={() => setShowImportPlaylist(true)}
               onSelectPlaylist={(playlist) => {
                 setSelectedPlaylist(playlist);
                 setView(ViewState.PLAYLIST_DETAIL);
@@ -846,6 +850,19 @@ const App = () => {
             onCreate={(name, description) => {
               createPlaylist(name, description);
               setShowCreatePlaylist(false);
+            }}
+          />
+
+          <ImportPlaylistModal
+            isOpen={showImportPlaylist}
+            onClose={() => setShowImportPlaylist(false)}
+            onImport={(name, songs) => {
+              const newPlaylist = createPlaylist(name, `Imported from Netease (${songs.length} songs)`);
+              setPlaylists(prev => prev.map(p =>
+                p.id === newPlaylist.id
+                  ? { ...p, songs: songs, coverUrl: songs[0]?.coverUrl || p.coverUrl }
+                  : p
+              ));
             }}
           />
 

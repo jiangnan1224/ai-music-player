@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Library, Sparkles, LogOut, Disc, Music, Plus } from 'lucide-react';
+import { Home, Search, Library, Sparkles, LogOut, Disc, Music, Plus, Download } from 'lucide-react';
 import { ViewState, Playlist } from '../types';
 
 interface SidebarProps {
@@ -8,10 +8,11 @@ interface SidebarProps {
   mobile?: boolean;
   playlists: Playlist[];
   onCreatePlaylist: () => void;
+  onImportPlaylist: () => void;
   onSelectPlaylist: (playlist: Playlist) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile, playlists, onCreatePlaylist, onSelectPlaylist }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile, playlists, onCreatePlaylist, onImportPlaylist, onSelectPlaylist }) => {
   const navItemClass = (view: ViewState) => `
     flex items-center gap-4 px-4 py-3 cursor-pointer transition-colors duration-200
     ${currentView === view ? 'text-white bg-white/10 rounded-md' : 'text-gray-400 hover:text-white'}
@@ -54,13 +55,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile, 
         <div className="mt-6 pt-6 border-t border-gray-800">
           <div className="flex items-center justify-between px-4 mb-3">
             <span className="text-sm font-semibold text-gray-400">MY PLAYLISTS</span>
-            <button
-              onClick={onCreatePlaylist}
-              className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
-              title="Create Playlist"
-            >
-              <Plus size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onImportPlaylist}
+                className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
+                title="Import from Netease"
+              >
+                <Download size={18} />
+              </button>
+              <button
+                onClick={onCreatePlaylist}
+                className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
+                title="Create Playlist"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1">
