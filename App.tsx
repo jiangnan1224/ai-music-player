@@ -201,34 +201,31 @@ const App = () => {
     onSwipeRight: () => setShowMobileSidebar(true),
   });
 
-  // Handle Mobile Player History State (Prevent App Exit on Back)
+  // Handle Mobile Player State via Hash (Robust Back Button Support)
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      // If back button is pressed and player is open, close it
-      if (showMobilePlayer) {
-        setShowMobilePlayer(false);
-      }
+    const handleHashChange = () => {
+      const isPlayerOpen = window.location.hash === '#player';
+      setShowMobilePlayer(isPlayerOpen);
     };
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [showMobilePlayer]);
+    // Initial check
+    handleHashChange();
 
-  // Push state when player opens
-  useEffect(() => {
-    if (showMobilePlayer) {
-      // Push state only if not already there (simple check)
-      // We use a specific state identifier
-      window.history.pushState({ overlay: 'mobile-player' }, '');
-    }
-  }, [showMobilePlayer]);
+    // Listen for hash changes (Back button, manual hash set)
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const openMobilePlayer = () => {
+    window.location.hash = 'player';
+  };
 
   const closeMobilePlayer = () => {
-    // If we have history state, go back (which triggers popstate -> closes player)
-    // Otherwise just close (fallback)
-    if (window.history.state?.overlay === 'mobile-player') {
+    // Only go back if we are actually in the player hash state
+    if (window.location.hash === '#player') {
       window.history.back();
     } else {
+      // Fallback for edge cases
       setShowMobilePlayer(false);
     }
   };
@@ -926,7 +923,7 @@ const App = () => {
       {/* Footer Player */}
       {currentSong && (
         <>
-          <div onClick={() => window.innerWidth < 768 && setShowMobilePlayer(true)}>
+          <div onClick={() => window.innerWidth < 768 && openMobilePlayer()}>
             <Player
               currentSong={currentSong}
               isPlaying={isPlaying}
