@@ -1,0 +1,5 @@
+{
+  "name": "TuneStream - AI Music Player",
+  "description": "A Spotify-like music streaming application featuring search, favorites, and AI-powered recommendations using Gemini and the TuneFree API.",
+  "requestFramePermissions": []
+}
