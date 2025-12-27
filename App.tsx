@@ -63,7 +63,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (u: string) => void }) => {
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-black flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="bg-black/40 backdrop-blur-xl p-8 rounded-2xl border border-white/10 w-full max-w-md">
         <div className="flex items-center justify-center mb-8">
-          <img src="/logo.png" alt="TuneStream" className="w-12 h-12 mr-3" />
+          <img src="/icon.png" alt="TuneStream" className="w-12 h-12 mr-3" />
           <h1 className="text-4xl font-bold text-white">TuneStream</h1>
         </div>
 
