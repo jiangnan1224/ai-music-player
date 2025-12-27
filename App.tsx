@@ -309,8 +309,8 @@ const App = () => {
     try {
       const allSongs = await api.getTopListSongs(source, listId);
       setSelectedPlaylist({ id: listId, name, songs: allSongs });
-      setSongs(allSongs); // Update main songs list for player context if needed, though we use selectedPlaylist for view
-      setView(ViewState.PLAYLIST_DETAIL);
+      setSongs(allSongs); // Update main songs list
+      setView(ViewState.TOP_LIST);
     } catch (e) {
       console.error("Failed to load full playlist", e);
     }
@@ -800,7 +800,7 @@ const App = () => {
                     </div>
                   )}
 
-                  {(view === ViewState.LIBRARY || view === ViewState.SEARCH) && (
+                  {(view === ViewState.LIBRARY || view === ViewState.SEARCH || view === ViewState.TOP_LIST) && (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                       {songs.map(song => (
                         <SongCard
@@ -937,48 +937,46 @@ const App = () => {
             togglePlaybackMode={togglePlaybackMode}
           />
 
-          {/* Create Playlist Modal */}
-          <CreatePlaylistModal
-            isOpen={showCreatePlaylist}
-            onClose={() => setShowCreatePlaylist(false)}
-            onCreate={(name, description) => {
-              createPlaylist(name, description);
-              setShowCreatePlaylist(false);
-            }}
-          />
-
-          <ImportPlaylistModal
-            isOpen={showImportPlaylist}
-            onClose={() => setShowImportPlaylist(false)}
-            onImport={(name, songs) => {
-              const newPlaylist = createPlaylist(name, `Imported from Netease (${songs.length} songs)`);
-              setPlaylists(prev => prev.map(p =>
-                p.id === newPlaylist.id
-                  ? { ...p, songs: songs, coverUrl: songs[0]?.coverUrl || p.coverUrl }
-                  : p
-              ));
-            }}
-          />
-
-          {/* Add to Playlist Modal */}
-          <AddToPlaylistModal
-            isOpen={!!selectedSongToAdd}
-            onClose={() => setSelectedSongToAdd(null)}
-            playlists={playlists}
-            song={selectedSongToAdd}
-            onAddToPlaylist={(playlistId, song) => {
-              addSongToPlaylist(playlistId, song);
-            }}
-            onCreateNew={() => {
-              setSelectedSongToAdd(null);
-              setShowCreatePlaylist(true);
-            }}
-          />
-
         </>
       )}
 
+      {/* Create Playlist Modal */}
+      <CreatePlaylistModal
+        isOpen={showCreatePlaylist}
+        onClose={() => setShowCreatePlaylist(false)}
+        onCreate={(name, description) => {
+          createPlaylist(name, description);
+          setShowCreatePlaylist(false);
+        }}
+      />
 
+      <ImportPlaylistModal
+        isOpen={showImportPlaylist}
+        onClose={() => setShowImportPlaylist(false)}
+        onImport={async (name, songs) => {
+          const newPlaylist = await createPlaylist(name, `Imported from Netease (${songs.length} songs)`);
+          setPlaylists(prev => prev.map(p =>
+            p.id === newPlaylist.id
+              ? { ...p, songs: songs, coverUrl: songs[0]?.coverUrl || p.coverUrl }
+              : p
+          ));
+        }}
+      />
+
+      {/* Add to Playlist Modal */}
+      <AddToPlaylistModal
+        isOpen={!!selectedSongToAdd}
+        onClose={() => setSelectedSongToAdd(null)}
+        playlists={playlists}
+        song={selectedSongToAdd}
+        onAddToPlaylist={(playlistId, song) => {
+          addSongToPlaylist(playlistId, song);
+        }}
+        onCreateNew={() => {
+          setSelectedSongToAdd(null);
+          setShowCreatePlaylist(true);
+        }}
+      />
     </div>
   );
 };

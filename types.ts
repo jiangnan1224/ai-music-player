@@ -20,7 +20,8 @@ export enum ViewState {
   SEARCH = 'SEARCH',
   LIBRARY = 'LIBRARY',
   MAGIC_DJ = 'MAGIC_DJ',
-  PLAYLIST_DETAIL = 'PLAYLIST_DETAIL'
+  PLAYLIST_DETAIL = 'PLAYLIST_DETAIL',
+  TOP_LIST = 'TOP_LIST'
 }
 
 export interface PlayerState {

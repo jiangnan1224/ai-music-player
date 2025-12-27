@@ -73,7 +73,8 @@ export const MobilePlayer: React.FC<MobilePlayerProps> = ({
 
     return (
         <div
-            className={`fixed inset-0 z-[60] bg-black/90 backdrop-blur-3xl flex flex-col transition-transform duration-500 cubic-bezier(0.32, 0.72, 0, 1) ${isOpen ? 'translate-y-0' : 'translate-y-full pointer-events-none'}`}
+            className={`fixed inset-0 z-[60] bg-black/90 backdrop-blur-3xl flex flex-col transition-transform duration-500 cubic-bezier(0.32, 0.72, 0, 1) overscroll-none ${isOpen ? 'translate-y-0' : 'translate-y-full pointer-events-none'}`}
+            style={{ overscrollBehavior: 'none' }}
             onTouchStart={swipeHandlers.onTouchStart}
             onTouchEnd={swipeHandlers.onTouchEnd}
         >
