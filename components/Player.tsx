@@ -88,7 +88,7 @@ export const Player: React.FC<PlayerProps> = ({
         }
       }
     }
-  }, [isPlaying]);
+  }, [isPlaying, currentSong]);
 
   // Update Media Session Metadata - separate from play/pause to ensure it always updates
   useEffect(() => {
