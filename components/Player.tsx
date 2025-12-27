@@ -17,12 +17,14 @@ interface PlayerProps {
   onDurationChange?: (duration: number) => void;
   onProgressChange?: (progress: number) => void;
   onSeekHandlerReady?: (handler: (e: React.ChangeEvent<HTMLInputElement>) => void) => void;
+  nextSong?: Song | null;
   playbackMode: 'loop' | 'shuffle' | 'repeat-one';
   togglePlaybackMode: () => void;
 }
 
 export const Player: React.FC<PlayerProps> = ({
   currentSong,
+  nextSong,
   isPlaying,
   onPlayPause,
   onNext,
@@ -44,19 +46,15 @@ export const Player: React.FC<PlayerProps> = ({
   const [volume, setVolume] = useState(1);
   const [duration, setDuration] = useState(0);
 
-  // Play/Pause handling with Media Session state
+  // Play/Pause handling
   useEffect(() => {
     if (audioRef.current) {
       if (isPlaying) {
+        // If the source matches current song (normal case)
+        // Or if we just switched sources via React state update
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise
-            .then(() => {
-              // Playback started successfully
-              if ('mediaSession' in navigator) {
-                navigator.mediaSession.playbackState = 'playing';
-              }
-            })
             .catch(e => {
               console.warn("Playback failed, retrying...", e);
               // iOS sometimes blocks playback in background
@@ -64,17 +62,9 @@ export const Player: React.FC<PlayerProps> = ({
               setTimeout(() => {
                 if (audioRef.current && isPlaying) {
                   audioRef.current.play()
-                    .then(() => {
-                      if ('mediaSession' in navigator) {
-                        navigator.mediaSession.playbackState = 'playing';
-                      }
-                    })
                     .catch(err => {
                       console.error("Playback retry failed", err);
-                      // Force paused state on persistent error
-                      if ('mediaSession' in navigator) {
-                        navigator.mediaSession.playbackState = 'paused';
-                      }
+                      // If it ultimately fails, we might want to notify UI, but for now we just log
                     });
                 }
               }, 100);
@@ -82,13 +72,43 @@ export const Player: React.FC<PlayerProps> = ({
         }
       } else {
         audioRef.current.pause();
-        // Immediately set paused state (don't wait for async)
-        if ('mediaSession' in navigator) {
-          navigator.mediaSession.playbackState = 'paused';
-        }
       }
     }
   }, [isPlaying, currentSong]);
+
+  const handleAudioPlaying = () => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
+  };
+
+  const handleAudioPause = () => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'paused';
+    }
+  };
+
+  // Sync Playback Handler for iOS Gapless
+  const handleEnded = () => {
+    if (nextSong && audioRef.current) {
+      console.log("Gapless switch to:", nextSong.title);
+      // 1. Sync switch source
+      audioRef.current.src = nextSong.audioUrl;
+      // 2. Sync play (allowed because we are in 'ended' event handler)
+      audioRef.current.play()
+        .catch(e => console.error("Gapless play failed", e));
+
+      // 3. Notify React to update state (will trigger re-render)
+      // Note: The re-render will update 'currentSong' prop.
+      // We need to ensure the useEffect doesn't double-play or reset.
+      // The useEffect depends on [currentSong]. When it updates, it triggers play().
+      // Since we already played, audio.play() in useEffect is fine (idempotent-ish).
+      onNext();
+    } else {
+      onNext();
+    }
+  };
+
 
   // Update Media Session Metadata - separate from play/pause to ensure it always updates
   useEffect(() => {
@@ -242,11 +262,12 @@ export const Player: React.FC<PlayerProps> = ({
         ref={audioRef}
         src={currentSong.audioUrl}
         onTimeUpdate={handleTimeUpdate}
-        onEnded={onNext}
+        onEnded={handleEnded}
         onError={handleAudioError}
+        onPlaying={handleAudioPlaying}
+        onPause={handleAudioPause}
         preload="auto"
         playsInline
-        autoPlay={isPlaying}
       />
 
       {/* Left: Song Info */}

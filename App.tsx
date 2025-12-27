@@ -7,7 +7,7 @@ import { api } from './services/api';
 import { cloudService } from './services/cloudStorage';
 import { getMusicRecommendation } from './services/geminiService';
 import { Song, User, ViewState, TopListCategory, Playlist } from './types';
-import { Search, Loader2, Sparkles, LogIn, Disc, LayoutGrid, List, Clock, Heart, Play, Menu, X, Repeat, Repeat1, Shuffle, ChevronLeft } from 'lucide-react';
+import { Search, Loader2, Sparkles, LogIn, Disc, LayoutGrid, List, Clock, Heart, Play, Menu, X, Repeat, Repeat1, Shuffle, ChevronLeft, ArrowLeft } from 'lucide-react';
 import { LyricsSidebar } from './components/LyricsSidebar';
 import { QueueSidebar } from './components/QueueSidebar';
 import { UserDropdown } from './components/UserDropdown';
@@ -585,6 +585,29 @@ const App = () => {
     setUser(null);
   };
 
+  const getNextSong = () => {
+    if (!currentSong || queue.length === 0) return null;
+    const idx = queue.findIndex(s => s.id === currentSong.id);
+    if (playbackMode === 'repeat-one') return currentSong;
+    if (playbackMode === 'shuffle') {
+      // Note: This logic is slightly non-deterministic for 'next' unless we use a seed/history
+      // But for calculating 'nextSong' prop it needs to be stable until 'handleNext' is called.
+      // This simple random check is problematic as it changes on every render.
+      // Ideally, in shuffle mode, 'next' is determined and stored.
+      // For now, to solve the gapless issue, let's keep it simple:
+      // If shuffle, we can't easily pre-determine ONE constant next song without state.
+      // Actually, if we pass a random one now, and then `handleNext` picks ANOTHER random one
+      // then we play the wrong song.
+      // So... we should probably only support gapless for sequential/loop for now, OR make shuffle deterministic.
+      return null; // Shuffle fallback to old behavior for safety
+    }
+    // Loop/Sequential
+    if (idx < queue.length - 1) return queue[idx + 1];
+    return queue[0];
+  };
+
+  const nextSong = getNextSong();
+
   if (!user) {
     return <LoginScreen onLogin={(u) => setUser({ id: '1', username: u })} />;
   }
@@ -688,7 +711,18 @@ const App = () => {
                   />
                 </form>
               ) : (
-                <h2 className="text-xl md:text-2xl font-bold capitalize truncate">{view === ViewState.PLAYLIST_DETAIL ? 'Playlist' : view.replace('_', ' ').toLowerCase()}</h2>
+                <h2 className="text-xl md:text-2xl font-bold capitalize truncate flex items-center gap-2">
+                  {view === ViewState.TOP_LIST && (
+                    <button
+                      onClick={() => setView(ViewState.HOME)}
+                      className="mr-2 p-1 rounded-full hover:bg-white/10 transition-colors"
+                      title="Back to Home"
+                    >
+                      <ArrowLeft size={24} />
+                    </button>
+                  )}
+                  {view === ViewState.PLAYLIST_DETAIL ? 'Playlist' : view.replace('_', ' ').toLowerCase()}
+                </h2>
               )}
             </div>
 
@@ -777,6 +811,11 @@ const App = () => {
                     <>
                       {isLoading && Object.keys(homeData).length === 0 ? (
                         <HomeSkeleton />
+                      ) : Object.keys(homeData).length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                          <p className="text-gray-400 mb-6 text-lg">Unable to load content</p>
+                          <Button onClick={loadHomeDashboard} className="px-8">Retry</Button>
+                        </div>
                       ) : (
                         <div className="space-y-12">
                           {['netease', 'qq', 'kuwo'].map(sourceKey => {
@@ -942,6 +981,7 @@ const App = () => {
           <div onClick={() => window.innerWidth < 768 && openMobilePlayer()}>
             <Player
               currentSong={currentSong}
+              nextSong={nextSong}
               isPlaying={isPlaying}
               onPlayPause={() => setIsPlaying(!isPlaying)}
               onNext={handleNext}
