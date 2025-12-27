@@ -986,12 +986,7 @@ const App = () => {
         isOpen={showImportPlaylist}
         onClose={() => setShowImportPlaylist(false)}
         onImport={async (name, songs) => {
-          const newPlaylist = await createPlaylist(name, `Imported from Netease (${songs.length} songs)`);
-          setPlaylists(prev => prev.map(p =>
-            p.id === newPlaylist.id
-              ? { ...p, songs: songs, coverUrl: songs[0]?.coverUrl || p.coverUrl }
-              : p
-          ));
+          await createPlaylist(name, `Imported from Netease (${songs.length} songs)`, songs);
         }}
       />
 
