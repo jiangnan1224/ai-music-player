@@ -117,29 +117,46 @@ export const MobilePlayer: React.FC<MobilePlayerProps> = ({
                 >
                     {/* PAGE 1: PLAYER (Vinyl) - Width 50% */}
                     <div className="w-[50%] h-full flex-shrink-0 flex flex-col px-8 pb-12">
-                        <div className="flex-1 relative flex items-center justify-center overflow-hidden">
-                            {/* Stylus Arm */}
-                            <div className={`absolute top-0 right-2 w-24 h-40 z-20 transition-transform duration-700 origin-top-right
-                        ${isPlaying ? 'rotate-0' : '-rotate-45'}`}>
-                                <div className="w-1 h-20 bg-gray-400 absolute right-4 top-0 origin-top rotate-12" />
-                                <div className="w-32 h-2 bg-gray-300 absolute right-4 top-16 rotate-[30deg] origin-right rounded-full shadow-lg" />
-                                <div className="w-8 h-12 bg-gray-200 absolute -left-6 bottom-4 rotate-[30deg] rounded shadow-md border-2 border-gray-400" />
+                        <div className="flex-1 relative flex items-center justify-center overflow-hidden pt-12">
+                            {/* Stylus Arm Container - Anchored to Top Right */}
+                            {/* Pivot Point */}
+                            <div className="absolute top-4 right-10 w-12 h-12 z-30 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-gray-300 shadow-xl border-2 border-gray-400" />
+                                <div className="absolute w-2 h-2 rounded-full bg-gray-500" />
+                            </div>
+
+                            {/* The Arm Itself */}
+                            <div className={`absolute top-8 right-14 w-24 h-64 z-20 transition-transform duration-700 origin-top-right ease-out
+                        ${isPlaying ? 'rotate-[20deg]' : 'rotate-[-25deg]'}`}>
+                                {/* Main Arm Shaft */}
+                                <div className="w-2 h-48 bg-gradient-to-b from-gray-300 to-gray-400 absolute right-2 top-0 rounded-full shadow-lg" />
+
+                                {/* Counterweight (Visual only at top) */}
+                                <div className="w-6 h-8 bg-gray-500 rounded absolute -top-2 -right-1 shadow-md" />
+
+                                {/* Angled Head Shell Holder */}
+                                <div className="absolute bottom-16 left-0 w-8 h-2 bg-gray-400 rotate-45 origin-right rounded-full" />
+
+                                {/* Cartridge/Head */}
+                                <div className="absolute bottom-12 -left-4 w-8 h-12 bg-gray-800 rounded-sm shadow-md border border-gray-600 rotate-12 flex flex-col items-center justify-end pb-1">
+                                    <div className="w-1 h-2 bg-white/50 rounded-full" />
+                                </div>
                             </div>
 
                             {/* Vinyl Record */}
-                            <div className={`w-72 h-72 rounded-full bg-black border-[8px] border-[#1a1a1a] shadow-2xl flex items-center justify-center relative
+                            <div className={`w-[80vw] h-[80vw] max-w-[320px] max-h-[320px] rounded-full bg-[#101010] border-4 border-[#1a1a1a] shadow-2xl flex items-center justify-center relative
                         ${isPlaying ? 'animate-spin-slow' : ''}`}
                                 style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
                             >
-                                {/* Grooves */}
-                                <div className="absolute inset-2 rounded-full border border-white/5" />
-                                <div className="absolute inset-4 rounded-full border border-white/5" />
-                                <div className="absolute inset-8 rounded-full border border-white/5" />
-                                <div className="absolute inset-12 rounded-full border border-white/5" />
-                                <div className="absolute inset-16 rounded-full border border-white/5" />
+                                {/* Grooves - using radial gradient for better effect */}
+                                <div className="absolute inset-0 rounded-full opacity-20"
+                                    style={{
+                                        background: 'repeating-radial-gradient(#333 0, #333 1px, transparent 2px, transparent 4px)'
+                                    }}
+                                />
 
                                 {/* Album Art Center */}
-                                <div className="w-40 h-40 rounded-full overflow-hidden border-4 border-[#111] relative z-10">
+                                <div className="w-[50%] h-[50%] rounded-full overflow-hidden border-8 border-[#151515] relative z-10 shadow-inner">
                                     <img src={currentSong.coverUrl} className="w-full h-full object-cover" alt="Album Art" />
                                 </div>
                             </div>

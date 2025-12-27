@@ -474,19 +474,19 @@ const App = () => {
   };
 
   // Playlist Management Functions
-  const createPlaylist = async (name: string, description?: string) => {
+  const createPlaylist = async (name: string, description?: string, initialSongs?: Song[]) => {
     const newPlaylist: Playlist = {
       id: crypto.randomUUID(), // Temp ID for optimistic, backend might assign real one if we let it
       name,
       description: description || '',
-      songs: [],
-      coverUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}&backgroundColor=121212`,
+      songs: initialSongs || [],
+      coverUrl: initialSongs?.[0]?.coverUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}&backgroundColor=121212`,
       createdAt: Date.now(),
       updatedAt: Date.now()
     };
 
     // Optimistic update
-    setPlaylists(prev => [...prev, newPlaylist]);
+    setPlaylists(prev => [newPlaylist, ...prev]);
 
     try {
       // Backend create
@@ -496,13 +496,15 @@ const App = () => {
       await cloudService.playlists.create(newPlaylist);
       // Reload to ensure sync
       loadPlaylists();
+      return newPlaylist;
     } catch (e) {
       console.error(e);
-      // Revert if failed? For now simpler to just log
+      // Revert optimistic update
+      setPlaylists(prev => prev.filter(p => p.id !== newPlaylist.id));
+      throw e;
     }
-
-    return newPlaylist;
   };
+
 
   const deletePlaylist = async (playlistId: string) => {
     // Optimistic
