@@ -42,9 +42,41 @@ export const Player: React.FC<PlayerProps> = ({
   togglePlaybackMode
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const nextSongBlobUrlRef = useRef<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
   const [duration, setDuration] = useState(0);
+
+  // Preload next song as Blob for gapless playback
+  useEffect(() => {
+    // Reset previous blob
+    if (nextSongBlobUrlRef.current) {
+      URL.revokeObjectURL(nextSongBlobUrlRef.current);
+      nextSongBlobUrlRef.current = null;
+    }
+
+    if (nextSong?.audioUrl) {
+      console.log('Preloading next song:', nextSong.title);
+      fetch(nextSong.audioUrl)
+        .then(response => response.blob())
+        .then(blob => {
+          const blobUrl = URL.createObjectURL(blob);
+          nextSongBlobUrlRef.current = blobUrl;
+          console.log('Preload complete for:', nextSong.title);
+        })
+        .catch(err => {
+          console.warn('Preload failed (likely CORS), falling back to normal URL:', err);
+        });
+    }
+
+    // Cleanup on unmount or change
+    return () => {
+      if (nextSongBlobUrlRef.current) {
+        URL.revokeObjectURL(nextSongBlobUrlRef.current);
+        nextSongBlobUrlRef.current = null;
+      }
+    };
+  }, [nextSong]);
 
   // Play/Pause handling
   useEffect(() => {
@@ -92,17 +124,23 @@ export const Player: React.FC<PlayerProps> = ({
   const handleEnded = () => {
     if (nextSong && audioRef.current) {
       console.log("Gapless switch to:", nextSong.title);
-      // 1. Sync switch source
-      audioRef.current.src = nextSong.audioUrl;
-      // 2. Sync play (allowed because we are in 'ended' event handler)
+
+      // 1. Prefer Blob URL for instant switch (Zero Latency)
+      const nextSrc = nextSongBlobUrlRef.current || nextSong.audioUrl;
+
+      // 2. Sync switch source
+      audioRef.current.src = nextSrc!;
+
+      // 3. Sync play (allowed because we are in 'ended' event handler)
       audioRef.current.play()
+        .then(() => {
+          // If we successfully used a blob, future cleanup will handle it.
+          // Note: changing src DOES NOT revoke the blob automatically, 
+          // but our useEffect cleanup handles it when nextSong changes.
+        })
         .catch(e => console.error("Gapless play failed", e));
 
-      // 3. Notify React to update state (will trigger re-render)
-      // Note: The re-render will update 'currentSong' prop.
-      // We need to ensure the useEffect doesn't double-play or reset.
-      // The useEffect depends on [currentSong]. When it updates, it triggers play().
-      // Since we already played, audio.play() in useEffect is fine (idempotent-ish).
+      // 4. Notify React to update state (will trigger re-render)
       onNext();
     } else {
       onNext();
