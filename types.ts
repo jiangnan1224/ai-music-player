@@ -36,3 +36,13 @@ export interface TopListCategory {
   pic?: string;
   updateFrequency?: string;
 }
+
+export interface Playlist {
+  id: string;
+  name: string;
+  description?: string;
+  songs: Song[];
+  coverUrl?: string;
+  createdAt: number;
+  updatedAt: number;
+}

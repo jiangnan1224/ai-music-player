@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, Heart } from 'lucide-react';
+import { Play, Pause, Heart, Plus } from 'lucide-react';
 import { Song } from '../types';
 
 interface SongCardProps {
@@ -9,9 +9,10 @@ interface SongCardProps {
   isPlaying: boolean;
   isFavorite: boolean;
   onToggleFavorite: (e: React.MouseEvent) => void;
+  onAddToPlaylist?: (e: React.MouseEvent) => void;
 }
 
-export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isCurrent, isPlaying, isFavorite, onToggleFavorite }) => {
+export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isCurrent, isPlaying, isFavorite, onToggleFavorite, onAddToPlaylist }) => {
   return (
     <div
       className="group relative bg-spotLight/40 hover:bg-spotLight p-4 rounded-lg transition-all duration-300 cursor-pointer flex flex-col gap-3"
@@ -42,6 +43,15 @@ export const SongCard: React.FC<SongCardProps> = ({ song, onPlay, isCurrent, isP
         >
           <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
         </button>
+        {onAddToPlaylist && (
+          <button
+            onClick={onAddToPlaylist}
+            className="absolute bottom-2 left-2 p-2 bg-spotGreen hover:bg-spotGreen/90 rounded-full transition-all shadow-lg z-10 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 duration-300"
+            title="Add to playlist"
+          >
+            <Plus size={16} className="text-black" />
+          </button>
+        )}
       </div>
       <div>
         <h3 className={`font-bold truncate ${isCurrent ? 'text-spotGreen' : 'text-white'}`}>

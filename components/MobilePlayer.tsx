@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
-import { Play, Pause, SkipBack, SkipForward, Heart, ChevronDown, Repeat, Shuffle, ListMusic } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Heart, ChevronDown, Repeat, Repeat1, Shuffle, ListMusic } from 'lucide-react';
 import { useSwipe } from '../utils/useSwipe';
 import { MobileLyrics } from './MobileLyrics';
 import { MobileQueue } from './MobileQueue';
@@ -18,6 +18,8 @@ interface MobilePlayerProps {
     onSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
     isFavorite: boolean;
     toggleFavorite: () => void;
+    playbackMode: 'loop' | 'shuffle' | 'repeat-one';
+    togglePlaybackMode: () => void;
 }
 
 export const MobilePlayer: React.FC<MobilePlayerProps> = ({
@@ -34,7 +36,9 @@ export const MobilePlayer: React.FC<MobilePlayerProps> = ({
     isFavorite,
     toggleFavorite,
     queue,
-    onPlay
+    onPlay,
+    playbackMode,
+    togglePlaybackMode
 }) => {
     const [view, setView] = useState<'player' | 'lyrics'>('player');
     const [showQueue, setShowQueue] = useState(false);
@@ -170,8 +174,13 @@ export const MobilePlayer: React.FC<MobilePlayerProps> = ({
 
                             {/* Main Controls */}
                             <div className="flex items-center justify-between px-4">
-                                <button className="text-gray-400 hover:text-white">
-                                    <Shuffle size={24} />
+                                <button
+                                    onClick={togglePlaybackMode}
+                                    className="text-gray-400 hover:text-white transition-colors"
+                                >
+                                    {playbackMode === 'loop' && <Repeat size={24} />}
+                                    {playbackMode === 'shuffle' && <Shuffle size={24} />}
+                                    {playbackMode === 'repeat-one' && <Repeat1 size={24} />}
                                 </button>
                                 <button onClick={onPrev} className="text-white hover:scale-110 transition-transform">
                                     <SkipBack size={40} fill="currentColor" />

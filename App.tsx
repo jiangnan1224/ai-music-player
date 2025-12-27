@@ -5,11 +5,14 @@ import { SongCard } from './components/SongCard';
 import { Button } from './components/Button';
 import { api } from './services/api';
 import { getMusicRecommendation } from './services/geminiService';
-import { Song, User, ViewState, TopListCategory } from './types';
-import { Search, Loader2, Sparkles, LogIn, Disc, LayoutGrid, List, Clock, Heart, Play, Menu, X } from 'lucide-react';
+import { Song, User, ViewState, TopListCategory, Playlist } from './types';
+import { Search, Loader2, Sparkles, LogIn, Disc, LayoutGrid, List, Clock, Heart, Play, Menu, X, Repeat, Repeat1, Shuffle, ChevronLeft } from 'lucide-react';
 import { LyricsSidebar } from './components/LyricsSidebar';
 import { QueueSidebar } from './components/QueueSidebar';
 import { UserDropdown } from './components/UserDropdown';
+import { CreatePlaylistModal } from './components/CreatePlaylistModal';
+import { PlaylistDetail } from './components/PlaylistDetail';
+import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { MobilePlayer } from './components/MobilePlayer';
 
 // Hardcoded password
@@ -107,10 +110,16 @@ const App = () => {
   });
   const [view, setView] = useState<ViewState>(ViewState.HOME);
 
-  // Player State
-  const [currentSong, setCurrentSong] = useState<Song | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [queue, setQueue] = useState<Song[]>([]);
+  // Player State - load from localStorage
+  const [currentSong, setCurrentSong] = useState<Song | null>(() => {
+    const saved = localStorage.getItem('tunestream_current_song');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isPlaying, setIsPlaying] = useState(false); // Always start paused on page load
+  const [queue, setQueue] = useState<Song[]>(() => {
+    const saved = localStorage.getItem('tunestream_queue');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Data State
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,12 +129,16 @@ const App = () => {
     const saved = localStorage.getItem('tunestream_library');
     return saved ? JSON.parse(saved) : [];
   });
+  const [playlists, setPlaylists] = useState<Playlist[]>(() => {
+    const saved = localStorage.getItem('tunestream_playlists');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isLoading, setIsLoading] = useState(false);
   // Dashboard State
   const [homeData, setHomeData] = useState<Record<string, { list: any, songs: Song[] }>>({});
   const [categories, setCategories] = useState<Record<string, TopListCategory[]>>({ netease: [], qq: [], kuwo: [] });
   const [activeCategory, setActiveCategory] = useState<Record<string, string>>({ netease: '', qq: '', kuwo: '' });
-  const [selectedPlaylist, setSelectedPlaylist] = useState<{ id: string, name: string, songs: Song[] } | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
   const [playlistViewMode, setPlaylistViewMode] = useState<'grid' | 'list'>('grid');
 
   // Lyrics & Queue State
@@ -133,10 +146,22 @@ const App = () => {
   const [showQueue, setShowQueue] = useState(false);
   const [showMobilePlayer, setShowMobilePlayer] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+  // Playlist UI State
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [selectedSongToAdd, setSelectedSongToAdd] = useState<Song | null>(null);
+
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [progress, setProgress] = useState(0);
   const seekHandlerRef = useRef<((e: React.ChangeEvent<HTMLInputElement>) => void) | null>(null);
+
+  // Playback mode: 'loop' | 'shuffle' | 'repeat-one'
+  type PlaybackMode = 'loop' | 'shuffle' | 'repeat-one';
+  const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(() => {
+    const saved = localStorage.getItem('tunestream_playback_mode');
+    return (saved as PlaybackMode) || 'loop';
+  });
 
   // Gemini State
   const [mood, setMood] = useState('');
@@ -152,6 +177,23 @@ const App = () => {
   useEffect(() => {
     localStorage.setItem('tunestream_library', JSON.stringify(library));
   }, [library]);
+
+  // Persist player state to localStorage
+  useEffect(() => {
+    if (currentSong) {
+      localStorage.setItem('tunestream_current_song', JSON.stringify(currentSong));
+    } else {
+      localStorage.removeItem('tunestream_current_song');
+    }
+  }, [currentSong]);
+
+  useEffect(() => {
+    localStorage.setItem('tunestream_queue', JSON.stringify(queue));
+  }, [queue]);
+
+  useEffect(() => {
+    localStorage.setItem('tunestream_playlists', JSON.stringify(playlists));
+  }, [playlists]);
 
   // Initial Load (Get some default songs)
   useEffect(() => {
@@ -302,20 +344,111 @@ const App = () => {
 
   const handleNext = () => {
     if (!currentSong || queue.length === 0) return;
+
     const idx = queue.findIndex(s => s.id === currentSong.id);
+
+    // Repeat single song
+    if (playbackMode === 'repeat-one') {
+      // Just replay the current song
+      playSong(currentSong);
+      return;
+    }
+
+    // Shuffle mode
+    if (playbackMode === 'shuffle') {
+      const randomIdx = Math.floor(Math.random() * queue.length);
+      playSong(queue[randomIdx]);
+      return;
+    }
+
+    // Loop mode (default)
     if (idx < queue.length - 1) {
       playSong(queue[idx + 1]);
     } else {
-      playSong(queue[0]); // Loop back
+      playSong(queue[0]); // Loop back to start
     }
   };
 
   const handlePrev = () => {
     if (!currentSong || queue.length === 0) return;
+
     const idx = queue.findIndex(s => s.id === currentSong.id);
+
+    // In shuffle mode, just pick random
+    if (playbackMode === 'shuffle') {
+      const randomIdx = Math.floor(Math.random() * queue.length);
+      playSong(queue[randomIdx]);
+      return;
+    }
+
+    // For loop and repeat-one, go to previous
     if (idx > 0) {
       playSong(queue[idx - 1]);
+    } else {
+      // Loop to end
+      playSong(queue[queue.length - 1]);
     }
+  };
+
+  const togglePlaybackMode = () => {
+    const modes: PlaybackMode[] = ['loop', 'shuffle', 'repeat-one'];
+    const currentIdx = modes.indexOf(playbackMode);
+    const nextMode = modes[(currentIdx + 1) % modes.length];
+    setPlaybackMode(nextMode);
+    localStorage.setItem('tunestream_playback_mode', nextMode);
+  };
+
+  // Playlist Management Functions
+  const createPlaylist = (name: string, description?: string) => {
+    const newPlaylist: Playlist = {
+      id: `playlist_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      description,
+      songs: [],
+      coverUrl: `https://api.dicebear.com/7.x/shapes/svg?seed=${encodeURIComponent(name)}&backgroundColor=121212`, // Dark theme background
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    setPlaylists([...playlists, newPlaylist]);
+    return newPlaylist;
+  };
+
+  const deletePlaylist = (playlistId: string) => {
+    setPlaylists(playlists.filter(p => p.id !== playlistId));
+  };
+
+  const renamePlaylist = (playlistId: string, newName: string, newDescription?: string) => {
+    setPlaylists(playlists.map(p =>
+      p.id === playlistId
+        ? { ...p, name: newName, description: newDescription, updatedAt: Date.now() }
+        : p
+    ));
+  };
+
+  const addSongToPlaylist = (playlistId: string, song: Song) => {
+    setPlaylists(playlists.map(p => {
+      if (p.id === playlistId) {
+        // If it's the first song being added, or if the current cover is a generated one, update it to the song's cover
+        const isGenerated = !p.coverUrl || p.coverUrl.includes('api.dicebear.com');
+        const shouldUpdateCover = p.songs.length === 0 && isGenerated;
+
+        return {
+          ...p,
+          songs: [...p.songs, song],
+          coverUrl: shouldUpdateCover ? song.coverUrl : p.coverUrl,
+          updatedAt: Date.now()
+        };
+      }
+      return p;
+    }));
+  };
+
+  const removeSongFromPlaylist = (playlistId: string, songId: string | number) => {
+    setPlaylists(playlists.map(p =>
+      p.id === playlistId
+        ? { ...p, songs: p.songs.filter(s => s.id !== songId), updatedAt: Date.now() }
+        : p
+    ));
   };
 
   const handleLogout = () => {
@@ -342,6 +475,12 @@ const App = () => {
                 setSongs([]);
                 setSearchQuery('');
               }
+            }}
+            playlists={playlists}
+            onCreatePlaylist={() => setShowCreatePlaylist(true)}
+            onSelectPlaylist={(playlist) => {
+              setSelectedPlaylist(playlist);
+              setView(ViewState.PLAYLIST_DETAIL);
             }}
           />
         </div>
@@ -380,6 +519,13 @@ const App = () => {
                 }
               }}
               mobile
+              playlists={playlists}
+              onCreatePlaylist={() => setShowCreatePlaylist(true)}
+              onSelectPlaylist={(playlist) => {
+                setSelectedPlaylist(playlist);
+                setView(ViewState.PLAYLIST_DETAIL);
+                setShowMobileSidebar(false);
+              }}
             />
           </div>
         </div>
@@ -411,7 +557,7 @@ const App = () => {
                   />
                 </form>
               ) : (
-                <h2 className="text-xl md:text-2xl font-bold capitalize truncate">{view.replace('_', ' ').toLowerCase()}</h2>
+                <h2 className="text-xl md:text-2xl font-bold capitalize truncate">{view === ViewState.PLAYLIST_DETAIL ? 'Playlist' : view.replace('_', ' ').toLowerCase()}</h2>
               )}
             </div>
 
@@ -452,6 +598,39 @@ const App = () => {
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Playlist Detail View */}
+            {view === ViewState.PLAYLIST_DETAIL && selectedPlaylist && (
+              <PlaylistDetail
+                playlist={selectedPlaylist}
+                onBack={() => setView(ViewState.LIBRARY)}
+                onPlay={(song, songs) => playSong(song, songs)}
+                onRemoveSong={(songId) => {
+                  if (selectedPlaylist) {
+                    removeSongFromPlaylist(selectedPlaylist.id, songId);
+                    // Update selectedPlaylist to reflect changes
+                    setSelectedPlaylist({
+                      ...selectedPlaylist,
+                      songs: selectedPlaylist.songs.filter(s => s.id !== songId)
+                    });
+                  }
+                }}
+                onRenamePlaylist={(name, desc) => {
+                  if (selectedPlaylist) {
+                    renamePlaylist(selectedPlaylist.id, name, desc);
+                    setSelectedPlaylist({ ...selectedPlaylist, name, description: desc });
+                  }
+                }}
+                onDeletePlaylist={() => {
+                  if (selectedPlaylist) {
+                    deletePlaylist(selectedPlaylist.id);
+                    setView(ViewState.LIBRARY);
+                  }
+                }}
+                isFavorite={(songId) => !!library.find(s => s.id === songId)}
+                toggleFavorite={toggleLibrary}
+              />
             )}
 
             {/* Song Grid */}
@@ -510,121 +689,16 @@ const App = () => {
                                   isPlaying={isPlaying && currentSong?.id === song.id}
                                   isFavorite={!!library.find(s => s.id === song.id)}
                                   onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
+                                  onAddToPlaylist={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedSongToAdd(song);
+                                  }}
                                 />
                               ))}
                             </div>
                           </div>
                         );
                       })}
-                    </div>
-                  )}
-
-                  {view === ViewState.PLAYLIST_DETAIL && selectedPlaylist && (
-                    <div>
-                      <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-4">
-                          <Button onClick={() => setView(ViewState.HOME)} variant="secondary">
-                            ← Back
-                          </Button>
-                          <h2 className="text-3xl font-bold">{selectedPlaylist.name}</h2>
-                        </div>
-
-                        {/* View Toggle */}
-                        <div className="flex bg-white/10 rounded-lg p-1">
-                          <button
-                            onClick={() => setPlaylistViewMode('grid')}
-                            className={`p-2 rounded-md transition-colors ${playlistViewMode === 'grid' ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'}`}
-                            title="Grid View"
-                          >
-                            <LayoutGrid size={20} />
-                          </button>
-                          <button
-                            onClick={() => setPlaylistViewMode('list')}
-                            className={`p-2 rounded-md transition-colors ${playlistViewMode === 'list' ? 'bg-white/20 text-white' : 'text-gray-400 hover:text-white'}`}
-                            title="List View"
-                          >
-                            <List size={20} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {playlistViewMode === 'grid' ? (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                          {selectedPlaylist.songs.map(song => (
-                            <SongCard
-                              key={song.id}
-                              song={song}
-                              onPlay={(s) => playSong(s, selectedPlaylist.songs)}
-                              isCurrent={currentSong?.id === song.id}
-                              isPlaying={isPlaying && currentSong?.id === song.id}
-                              isFavorite={!!library.find(s => s.id === song.id)}
-                              onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col">
-                          {/* List Header */}
-                          <div className="grid grid-cols-[auto_2fr_1fr_auto] md:grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 px-2 md:px-4 py-2 text-gray-400 text-sm border-b border-white/10 mb-2">
-                            <span className="w-8 text-center">#</span>
-                            <span>Title</span>
-                            <span>Artist</span>
-                            <span className="hidden md:block">Album</span>
-                            <span className="w-16 text-right"><Clock size={16} className="ml-auto" /></span>
-                          </div>
-
-                          {/* List Items */}
-                          <div className="space-y-1">
-                            {selectedPlaylist.songs.map((song, idx) => {
-                              const isCurrent = currentSong?.id === song.id;
-                              const isFavorite = !!library.find(s => s.id === song.id);
-
-                              return (
-                                <div
-                                  key={song.id}
-                                  className={`group grid grid-cols-[auto_2fr_1fr_auto] md:grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 px-2 md:px-4 py-3 rounded-lg items-center cursor-pointer transition-colors
-                                    ${isCurrent ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                                  onClick={() => playSong(song, selectedPlaylist.songs)}
-                                >
-                                  <div className="w-8 text-center flex items-center justify-center">
-                                    {isCurrent && isPlaying ? (
-                                      <span className="text-spotGreen animate-pulse">♫</span>
-                                    ) : (
-                                      <>
-                                        <span className="group-hover:hidden text-gray-500">{idx + 1}</span>
-                                        <Play size={16} fill="white" className="hidden group-hover:block text-white" />
-                                      </>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center gap-3 min-w-0">
-                                    <img src={song.coverUrl} className="w-10 h-10 rounded shadow-md" alt="" />
-                                    <span className={`truncate font-medium ${isCurrent ? 'text-spotGreen' : 'text-white'}`}>
-                                      {song.title}
-                                    </span>
-                                  </div>
-
-                                  <span className="text-gray-400 truncate">{song.artist}</span>
-                                  <span className="text-gray-400 truncate hidden md:block">{song.album}</span>
-
-                                  <div className="flex items-center gap-3">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); toggleLibrary(song); }}
-                                      className={`transition-transform hover:scale-110 ${isFavorite ? 'text-spotGreen opacity-100' : 'text-gray-400 opacity-0 group-hover:opacity-100'}`}
-                                    >
-                                      <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
-                                    </button>
-                                    <span className="text-gray-500 text-sm w-16 text-right">
-                                      {/* Placeholder duration if 0 */}
-                                      3:00
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -639,6 +713,10 @@ const App = () => {
                           isPlaying={isPlaying && currentSong?.id === song.id}
                           isFavorite={!!library.find(s => s.id === song.id)}
                           onToggleFavorite={(e) => { e.stopPropagation(); toggleLibrary(song); }}
+                          onAddToPlaylist={(e) => {
+                            e.stopPropagation();
+                            setSelectedSongToAdd(song);
+                          }}
                         />
                       ))}
                     </div>
@@ -733,6 +811,8 @@ const App = () => {
               onDurationChange={(d) => setDuration(d)}
               onProgressChange={(p) => setProgress(p)}
               onSeekHandlerReady={(handler) => { seekHandlerRef.current = handler; }}
+              playbackMode={playbackMode}
+              togglePlaybackMode={togglePlaybackMode}
             />
           </div>
           {/* Mobile Player Overlay - Persistent for transitions */}
@@ -755,6 +835,33 @@ const App = () => {
             toggleFavorite={() => toggleLibrary(currentSong)}
             queue={queue}
             onPlay={(song) => playSong(song, queue)} // Play context is current queue
+            playbackMode={playbackMode}
+            togglePlaybackMode={togglePlaybackMode}
+          />
+
+          {/* Create Playlist Modal */}
+          <CreatePlaylistModal
+            isOpen={showCreatePlaylist}
+            onClose={() => setShowCreatePlaylist(false)}
+            onCreate={(name, description) => {
+              createPlaylist(name, description);
+              setShowCreatePlaylist(false);
+            }}
+          />
+
+          {/* Add to Playlist Modal */}
+          <AddToPlaylistModal
+            isOpen={!!selectedSongToAdd}
+            onClose={() => setSelectedSongToAdd(null)}
+            playlists={playlists}
+            song={selectedSongToAdd}
+            onAddToPlaylist={(playlistId, song) => {
+              addSongToPlaylist(playlistId, song);
+            }}
+            onCreateNew={() => {
+              setSelectedSongToAdd(null);
+              setShowCreatePlaylist(true);
+            }}
           />
 
         </>

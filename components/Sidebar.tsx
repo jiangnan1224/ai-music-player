@@ -1,14 +1,17 @@
 import React from 'react';
-import { Home, Search, Library, Sparkles, LogOut, Disc } from 'lucide-react';
-import { ViewState } from '../types';
+import { Home, Search, Library, Sparkles, LogOut, Disc, Music, Plus } from 'lucide-react';
+import { ViewState, Playlist } from '../types';
 
 interface SidebarProps {
   currentView: ViewState;
   setView: (view: ViewState) => void;
   mobile?: boolean;
+  playlists: Playlist[];
+  onCreatePlaylist: () => void;
+  onSelectPlaylist: (playlist: Playlist) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile, playlists, onCreatePlaylist, onSelectPlaylist }) => {
   const navItemClass = (view: ViewState) => `
     flex items-center gap-4 px-4 py-3 cursor-pointer transition-colors duration-200
     ${currentView === view ? 'text-white bg-white/10 rounded-md' : 'text-gray-400 hover:text-white'}
@@ -46,6 +49,46 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, mobile }
             <span className="font-bold">Magic DJ (Gemini)</span>
           </div>
         </div> */}
+
+        {/* Playlists Section */}
+        <div className="mt-6 pt-6 border-t border-gray-800">
+          <div className="flex items-center justify-between px-4 mb-3">
+            <span className="text-sm font-semibold text-gray-400">MY PLAYLISTS</span>
+            <button
+              onClick={onCreatePlaylist}
+              className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded"
+              title="Create Playlist"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            {(!playlists || playlists.length === 0) ? (
+              <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                No playlists yet
+                <br />
+                <button onClick={onCreatePlaylist} className="text-spotGreen hover:underline mt-2">
+                  Create your first playlist
+                </button>
+              </div>
+            ) : (
+              playlists.map(playlist => (
+                <div
+                  key={playlist.id}
+                  onClick={() => onSelectPlaylist(playlist)}
+                  className="flex items-center gap-3 px-4 py-2 cursor-pointer text-gray-400 hover:text-white hover:bg-white/5 rounded-md transition-colors group"
+                >
+                  <Music size={20} className="flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{playlist.name}</div>
+                    <div className="text-xs text-gray-500">{playlist.songs.length} songs</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </nav>
 
 

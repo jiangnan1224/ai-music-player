@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Heart, ListMusic, Mic2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Heart, ListMusic, Mic2, Repeat, Repeat1, Shuffle } from 'lucide-react';
 import { Song } from '../types';
 
 interface PlayerProps {
@@ -17,6 +17,8 @@ interface PlayerProps {
   onDurationChange?: (duration: number) => void;
   onProgressChange?: (progress: number) => void;
   onSeekHandlerReady?: (handler: (e: React.ChangeEvent<HTMLInputElement>) => void) => void;
+  playbackMode: 'loop' | 'shuffle' | 'repeat-one';
+  togglePlaybackMode: () => void;
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -33,7 +35,9 @@ export const Player: React.FC<PlayerProps> = ({
   onSeek: externalOnSeek,
   onDurationChange,
   onProgressChange,
-  onSeekHandlerReady
+  onSeekHandlerReady,
+  playbackMode,
+  togglePlaybackMode
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [progress, setProgress] = useState(0);
@@ -54,11 +58,26 @@ export const Player: React.FC<PlayerProps> = ({
               }
             })
             .catch(e => {
-              console.error("Playback failed", e);
-              // Force paused state on error
-              if ('mediaSession' in navigator) {
-                navigator.mediaSession.playbackState = 'paused';
-              }
+              console.warn("Playback failed, retrying...", e);
+              // iOS sometimes blocks playback in background
+              // Retry after a short delay
+              setTimeout(() => {
+                if (audioRef.current && isPlaying) {
+                  audioRef.current.play()
+                    .then(() => {
+                      if ('mediaSession' in navigator) {
+                        navigator.mediaSession.playbackState = 'playing';
+                      }
+                    })
+                    .catch(err => {
+                      console.error("Playback retry failed", err);
+                      // Force paused state on persistent error
+                      if ('mediaSession' in navigator) {
+                        navigator.mediaSession.playbackState = 'paused';
+                      }
+                    });
+                }
+              }, 100);
             });
         }
       } else {
@@ -173,6 +192,22 @@ export const Player: React.FC<PlayerProps> = ({
     }
   };
 
+  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
+    const error = audioRef.current?.error;
+    console.error('Audio playback error:', {
+      code: error?.code,
+      message: error?.message,
+      song: currentSong?.title
+    });
+
+    // Auto-skip to next song on error to prevent playback from stopping
+    // This handles broken URLs, network failures, codec issues, etc.
+    setTimeout(() => {
+      console.warn('Skipping to next song due to playback error');
+      onNext();
+    }, 500);
+  };
+
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     if (audioRef.current && duration) {
@@ -208,8 +243,10 @@ export const Player: React.FC<PlayerProps> = ({
         src={currentSong.audioUrl}
         onTimeUpdate={handleTimeUpdate}
         onEnded={onNext}
+        onError={handleAudioError}
         preload="auto"
         playsInline
+        autoPlay={isPlaying}
       />
 
       {/* Left: Song Info */}
@@ -277,8 +314,18 @@ export const Player: React.FC<PlayerProps> = ({
         </div>
       </div>
 
-      {/* Right: Volume */}
+      {/* Right: Controls */}
       <div className="hidden md:flex items-center justify-end w-1/4 min-w-[150px] gap-2">
+        {/* Playback Mode Button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); togglePlaybackMode(); }}
+          className="text-gray-400 hover:text-white cursor-pointer transition-colors"
+          title={playbackMode === 'loop' ? '列表循环' : playbackMode === 'shuffle' ? '随机播放' : '单曲循环'}
+        >
+          {playbackMode === 'loop' && <Repeat size={20} />}
+          {playbackMode === 'shuffle' && <Shuffle size={20} />}
+          {playbackMode === 'repeat-one' && <Repeat1 size={20} />}
+        </button>
         <ListMusic size={20} className="text-gray-400 hover:text-white cursor-pointer mr-2" onClick={(e) => { e.stopPropagation(); toggleQueue(); }} />
         <Volume2 size={20} className="text-gray-400" />
         <input
