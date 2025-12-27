@@ -201,6 +201,38 @@ const App = () => {
     onSwipeRight: () => setShowMobileSidebar(true),
   });
 
+  // Handle Mobile Player History State (Prevent App Exit on Back)
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // If back button is pressed and player is open, close it
+      if (showMobilePlayer) {
+        setShowMobilePlayer(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [showMobilePlayer]);
+
+  // Push state when player opens
+  useEffect(() => {
+    if (showMobilePlayer) {
+      // Push state only if not already there (simple check)
+      // We use a specific state identifier
+      window.history.pushState({ overlay: 'mobile-player' }, '');
+    }
+  }, [showMobilePlayer]);
+
+  const closeMobilePlayer = () => {
+    // If we have history state, go back (which triggers popstate -> closes player)
+    // Otherwise just close (fallback)
+    if (window.history.state?.overlay === 'mobile-player') {
+      window.history.back();
+    } else {
+      setShowMobilePlayer(false);
+    }
+  };
+
   // Save library to localStorage
   useEffect(() => {
     localStorage.setItem('tunestream_library', JSON.stringify(library));
@@ -921,7 +953,7 @@ const App = () => {
             onNext={handleNext}
             onPrev={handlePrev}
             isOpen={showMobilePlayer}
-            onClose={() => setShowMobilePlayer(false)}
+            onClose={closeMobilePlayer}
             progress={progress}
             duration={duration}
             onSeek={(e) => {
