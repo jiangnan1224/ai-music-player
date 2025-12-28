@@ -27,7 +27,7 @@ export const onRequestPut: PagesFunction<Env> = async (context) => {
         await env.DB.prepare(
             'UPDATE playlists SET name = ?, description = ?, cover_url = ?, songs = ?, updated_at = ? WHERE id = ?'
         )
-            .bind(name, description, coverUrl, JSON.stringify(songs || []), updatedAt || Date.now(), playlistId)
+            .bind(name, description || null, coverUrl || null, JSON.stringify(songs || []), updatedAt || Date.now(), playlistId)
             .run();
 
         return new Response(JSON.stringify({ id: playlistId, message: 'Playlist updated' }), {

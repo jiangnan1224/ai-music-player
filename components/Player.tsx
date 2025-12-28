@@ -58,14 +58,33 @@ export const Player: React.FC<PlayerProps> = ({
     if (nextSong?.audioUrl) {
       console.log('Preloading next song:', nextSong.title);
       fetch(nextSong.audioUrl)
-        .then(response => response.blob())
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+          }
+          const contentType = response.headers.get('content-type');
+          if (contentType && !contentType.startsWith('audio/')) {
+            throw new Error(`Invalid content type: ${contentType}`);
+          }
+          return response.blob();
+        })
         .then(blob => {
+          if (blob.size < 1000) {
+            // Safety check: too small blob is likely an error message
+            console.warn('Blob too small, ignoring:', blob.size);
+            return;
+          }
           const blobUrl = URL.createObjectURL(blob);
           nextSongBlobUrlRef.current = blobUrl;
           console.log('Preload complete for:', nextSong.title);
         })
         .catch(err => {
-          console.warn('Preload failed (likely CORS), falling back to normal URL:', err);
+          console.warn('Preload failed (likely CORS or 404), falling back to normal URL:', err);
+          // Ensure we don't have a broken blob ref
+          if (nextSongBlobUrlRef.current) {
+            URL.revokeObjectURL(nextSongBlobUrlRef.current);
+            nextSongBlobUrlRef.current = null;
+          }
         });
     }
 
