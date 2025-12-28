@@ -17,6 +17,27 @@ import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { ImportPlaylistModal } from './components/ImportPlaylistModal';
 import { MobilePlayer } from './components/MobilePlayer';
 import { HomeSkeleton, GridSkeleton } from './components/LoadingSkeleton';
+import { API_BASE_URL } from './constants';
+
+// Helper to strip heavy fields like audioUrl before saving to DB
+const sanitizeSongsForStorage = (songs: Song[]): Song[] => {
+  return songs.map(s => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { audioUrl, ...rest } = s;
+    return rest;
+  });
+};
+
+// Helper to add back audioUrl if missing (e.g. from DB)
+const rehydrateSongs = (songs: Song[]): Song[] => {
+  return songs.map(s => {
+    if (s.audioUrl) return s;
+    return {
+      ...s,
+      audioUrl: `${API_BASE_URL}/api/?source=${s.platform || 'netease'}&id=${s.id}&type=url&br=320k`
+    };
+  });
+};
 
 // Hardcoded password
 const HARDCODED_PASSWORD = 'jiangnan';
