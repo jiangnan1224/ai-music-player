@@ -5,6 +5,15 @@ import { cache, TTL } from '../utils/cache';
 // Flag to force mock mode if the real API is unstable or requires specific unknown headers
 const USE_MOCK = false;
 
+const formatUrl = (url: string, platform: string) => {
+  // Kuwo and QQ often have strict CORS or mixed content issues (HTTP vs HTTPS)
+  // Route them through our own backend proxy to fix SSL/CORS
+  if (platform === 'kuwo' || platform === 'qq') {
+    return `/api/proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
 export const api = {
   login: async (username: string): Promise<User> => {
     // Simulating login as most public music APIs don't have open registration
@@ -40,19 +49,23 @@ export const api = {
       }
 
       // Adapt the response to our Song interface
-      return data.data.results.map((s: any) => ({
-        id: s.id,
-        title: s.name,
-        artist: s.artist,
-        album: s.album || 'Unknown Album',
-        // Construct URLs dynamically based on API docs
-        coverUrl: `${API_BASE_URL}/api/?source=${s.platform}&id=${s.id}&type=pic`,
-        audioUrl: `${API_BASE_URL}/api/?source=${s.platform}&id=${s.id}&type=url&br=320k`,
-        platform: s.platform,
-        // API doesn't return duration in aggregate search, so we might need a fallback or fetch details. 
-        // For now, 0 or specific fetch is needed. Let's start with 0.
-        duration: 0
-      }));
+      return data.data.results.map((s: any) => {
+        const rawCover = `${API_BASE_URL}/api/?source=${s.platform}&id=${s.id}&type=pic`;
+        const rawAudio = `${API_BASE_URL}/api/?source=${s.platform}&id=${s.id}&type=url&br=320k`;
+        return {
+          id: s.id,
+          title: s.name,
+          artist: s.artist,
+          album: s.album || 'Unknown Album',
+          // Construct URLs dynamically based on API docs
+          coverUrl: formatUrl(rawCover, s.platform),
+          audioUrl: formatUrl(rawAudio, s.platform),
+          platform: s.platform,
+          // API doesn't return duration in aggregate search, so we might need a fallback or fetch details. 
+          // For now, 0 or specific fetch is needed. Let's start with 0.
+          duration: 0
+        };
+      });
     } catch (e) {
       console.error("API Error, falling back to mock", e);
       return MOCK_SONGS;
@@ -78,16 +91,20 @@ export const api = {
         if (!res.ok) throw new Error('Failed to fetch playlist');
         const data = await res.json();
 
-        return data.data?.list?.map((s: any) => ({
-          id: s.id,
-          title: s.name,
-          artist: s.artist,
-          album: s.album || 'Unknown Album',
-          coverUrl: s.pic || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=pic`,
-          audioUrl: s.url || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=url&br=320k`,
-          platform: source,
-          duration: 0
-        })) || [];
+        return data.data?.list?.map((s: any) => {
+          const rawCover = s.pic || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=pic`;
+          const rawAudio = s.url || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=url&br=320k`;
+          return {
+            id: s.id,
+            title: s.name,
+            artist: s.artist,
+            album: s.album || 'Unknown Album',
+            coverUrl: formatUrl(rawCover, source),
+            audioUrl: formatUrl(rawAudio, source),
+            platform: source,
+            duration: 0
+          };
+        }) || [];
       } catch (e) {
         console.error(e);
         return [];
@@ -131,16 +148,20 @@ export const api = {
         if (!res.ok) throw new Error('Failed to fetch toplist songs');
         const data = await res.json();
 
-        return data.data?.list?.map((s: any) => ({
-          id: s.id,
-          title: s.name,
-          artist: s.artist,
-          album: s.album || 'Unknown Album',
-          coverUrl: s.pic || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=pic`,
-          audioUrl: s.url || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=url&br=320k`,
-          platform: source,
-          duration: 0
-        })) || [];
+        return data.data?.list?.map((s: any) => {
+          const rawCover = s.pic || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=pic`;
+          const rawAudio = s.url || `${API_BASE_URL}/api/?source=${source}&id=${s.id}&type=url&br=320k`;
+          return {
+            id: s.id,
+            title: s.name,
+            artist: s.artist,
+            album: s.album || 'Unknown Album',
+            coverUrl: formatUrl(rawCover, source),
+            audioUrl: formatUrl(rawAudio, source),
+            platform: source,
+            duration: 0
+          };
+        }) || [];
       } catch (e) {
         console.error(e);
         return [];

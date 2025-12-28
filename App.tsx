@@ -32,9 +32,17 @@ const sanitizeSongsForStorage = (songs: Song[]): Song[] => {
 const rehydrateSongs = (songs: Song[]): Song[] => {
   return songs.map(s => {
     if (s.audioUrl) return s;
+    const rawUrl = `${API_BASE_URL}/api/?source=${s.platform || 'netease'}&id=${s.id}&type=url&br=320k`;
+
+    let audioUrl = rawUrl;
+    // Route problematic platforms through our proxy
+    if (s.platform === 'kuwo' || s.platform === 'qq') {
+      audioUrl = `/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+    }
+
     return {
       ...s,
-      audioUrl: `${API_BASE_URL}/api/?source=${s.platform || 'netease'}&id=${s.id}&type=url&br=320k`
+      audioUrl
     };
   });
 };
