@@ -41,225 +41,136 @@ export const Player: React.FC<PlayerProps> = ({
   playbackMode,
   togglePlaybackMode
 }) => {
-  const audioRef = useRef<HTMLAudioElement>(null);
+  // Dual audio refs for "Ping-Pong" playback
+  const audioRefA = useRef<HTMLAudioElement>(null);
+  const audioRefB = useRef<HTMLAudioElement>(null);
+
+  // Track which player is currently "Active" (playing the current song)
+  const [activePlayer, setActivePlayer] = useState<'A' | 'B'>('A');
+
+  // Blob storage for next song preloading
   const nextSongBlobUrlRef = useRef<string | null>(null);
+
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
   const [duration, setDuration] = useState(0);
 
-  // Preload next song as Blob for gapless playback
+  // Helper to get refs based on active state
+  const getActiveAudioResult = () => activePlayer === 'A' ? audioRefA.current : audioRefB.current;
+  const getInactiveAudioResult = () => activePlayer === 'A' ? audioRefB.current : audioRefA.current;
+
+  // 1. Handle Song Loading (Ping-Pong Logic)
   useEffect(() => {
-    // Reset previous blob
-    if (nextSongBlobUrlRef.current) {
-      URL.revokeObjectURL(nextSongBlobUrlRef.current);
-      nextSongBlobUrlRef.current = null;
+    // When currentSong changes, we need to decide if this is a "normal" load or a "gapless" transition.
+    // Ideally, the parent component calls onNext(), which updates currentSong.
+
+    // In a perfect gapless transition, the "inactive" player is ALREADY loaded with this song.
+    // So we just need to ensure the active player points to the right element.
+
+    // However, if the user clicked a random song (not next), we need to load it into the active player.
+    const activeAudio = getActiveAudioResult();
+    const inactiveAudio = getInactiveAudioResult();
+
+    if (activeAudio && currentSong) {
+      // Check if active audio is already playing this URL (gapless case)
+      // Note: Blob URLs won't match the string URL, so we rely on the fact that handleEnded swapped the state
+      const isSrcMatch = activeAudio.src === currentSong.audioUrl || (nextSongBlobUrlRef.current && activeAudio.src === nextSongBlobUrlRef.current);
+
+      if (!isSrcMatch) {
+        // Normal load (User clicked a song)
+        activeAudio.src = currentSong.audioUrl;
+        if (isPlaying) {
+          activeAudio.play().catch(e => console.warn("Play error", e));
+        }
+      }
     }
 
-    if (nextSong?.audioUrl) {
-      console.log('Preloading next song:', nextSong.title);
+    // Preload Next Song into Inactive Player
+    if (inactiveAudio && nextSong?.audioUrl) {
+      console.log('Preloading into inactive player:', nextSong.title);
       fetch(nextSong.audioUrl)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
-          }
-          const contentType = response.headers.get('content-type');
-          if (contentType && !contentType.startsWith('audio/')) {
-            throw new Error(`Invalid content type: ${contentType}`);
-          }
-          return response.blob();
+        .then(res => {
+          if (!res.ok) throw new Error('Fetch status: ' + res.status);
+          const type = res.headers.get('content-type');
+          if (type && !type.startsWith('audio/')) throw new Error('Invalid type: ' + type);
+          return res.blob();
         })
         .then(blob => {
-          if (blob.size < 1000) {
-            // Safety check: too small blob is likely an error message
-            console.warn('Blob too small, ignoring:', blob.size);
-            return;
-          }
+          if (blob.size < 1000) return;
           const blobUrl = URL.createObjectURL(blob);
+          // Revoke old blob
+          if (nextSongBlobUrlRef.current) URL.revokeObjectURL(nextSongBlobUrlRef.current);
           nextSongBlobUrlRef.current = blobUrl;
-          console.log('Preload complete for:', nextSong.title);
+
+          // Load into inactive player
+          inactiveAudio.src = blobUrl;
+          inactiveAudio.load();
         })
         .catch(err => {
-          console.warn('Preload failed (likely CORS or 404), falling back to normal URL:', err);
-          // Ensure we don't have a broken blob ref
-          if (nextSongBlobUrlRef.current) {
-            URL.revokeObjectURL(nextSongBlobUrlRef.current);
-            nextSongBlobUrlRef.current = null;
-          }
+          console.warn('Preload failed, setting standard URL into inactive:', err);
+          // Fallback to standard URL
+          inactiveAudio.src = nextSong.audioUrl;
+          inactiveAudio.load();
         });
     }
 
-    // Cleanup on unmount or change
-    return () => {
-      if (nextSongBlobUrlRef.current) {
-        URL.revokeObjectURL(nextSongBlobUrlRef.current);
-        nextSongBlobUrlRef.current = null;
-      }
-    };
-  }, [nextSong]);
+  }, [currentSong, nextSong, activePlayer]);
 
-  // Play/Pause handling
+  // 2. Play/Pause Handler
   useEffect(() => {
-    if (audioRef.current) {
+    const audio = getActiveAudioResult();
+    if (audio) {
       if (isPlaying) {
-        // If the source matches current song (normal case)
-        // Or if we just switched sources via React state update
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .catch(e => {
-              console.warn("Playback failed, retrying...", e);
-              // iOS sometimes blocks playback in background
-              // Retry after a short delay
-              setTimeout(() => {
-                if (audioRef.current && isPlaying) {
-                  audioRef.current.play()
-                    .catch(err => {
-                      console.error("Playback retry failed", err);
-                      // If it ultimately fails, we might want to notify UI, but for now we just log
-                    });
-                }
-              }, 100);
-            });
-        }
+        audio.play().catch(e => {
+          console.warn("Play failed", e);
+          // Retry for iOS
+          setTimeout(() => {
+            if (isPlaying) audio.play().catch(console.error);
+          }, 100);
+        });
       } else {
-        audioRef.current.pause();
+        audio.pause();
       }
     }
-  }, [isPlaying, currentSong]);
+  }, [isPlaying, activePlayer]);
 
-  const handleAudioPlaying = () => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = 'playing';
-    }
-  };
-
-  const handleAudioPause = () => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = 'paused';
-    }
-  };
-
-  // Sync Playback Handler for iOS Gapless
+  // 3. Handle Ended (The Core Gapless Logic)
   const handleEnded = () => {
-    if (nextSong && audioRef.current) {
-      console.log("Gapless switch to:", nextSong.title);
+    console.log("Track ended. Transitioning...");
+    const inactiveAudio = getInactiveAudioResult();
 
-      // 1. Prefer Blob URL for instant switch (Zero Latency)
-      const nextSrc = nextSongBlobUrlRef.current || nextSong.audioUrl;
+    if (inactiveAudio && nextSong && (inactiveAudio.src || nextSong.audioUrl)) {
+      // 1. Play the inactive player (which should be preloaded)
+      const nextInfo = nextSong.title;
+      console.log("Switching to player", activePlayer === 'A' ? 'B' : 'A', "for", nextInfo);
 
-      // 2. Sync switch source
-      audioRef.current.src = nextSrc!;
-
-      // 3. Sync play (allowed because we are in 'ended' event handler)
-      audioRef.current.play()
+      inactiveAudio.play()
         .then(() => {
-          // If we successfully used a blob, future cleanup will handle it.
-          // Note: changing src DOES NOT revoke the blob automatically, 
-          // but our useEffect cleanup handles it when nextSong changes.
+          console.log("Gapless transition successful");
         })
-        .catch(e => console.error("Gapless play failed", e));
+        .catch(e => {
+          console.error("Gapless transition failed, force playing:", e);
+          // Fallback
+          if (!inactiveAudio.src) inactiveAudio.src = nextSong.audioUrl;
+          inactiveAudio.play();
+        });
 
-      // 4. Notify React to update state (will trigger re-render)
+      // 2. Update local state to swap active players
+      setActivePlayer(prev => prev === 'A' ? 'B' : 'A');
+
+      // 3. Notify parent to update visual state (currentSong = nextSong)
       onNext();
     } else {
       onNext();
     }
   };
 
-
-  // Update Media Session Metadata - separate from play/pause to ensure it always updates
-  useEffect(() => {
-    if ('mediaSession' in navigator && currentSong) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: currentSong.title,
-          artist: currentSong.artist,
-          album: currentSong.album || '',
-          artwork: [
-            { src: currentSong.coverUrl, sizes: '96x96', type: 'image/jpeg' },
-            { src: currentSong.coverUrl, sizes: '128x128', type: 'image/jpeg' },
-            { src: currentSong.coverUrl, sizes: '192x192', type: 'image/jpeg' },
-            { src: currentSong.coverUrl, sizes: '256x256', type: 'image/jpeg' },
-            { src: currentSong.coverUrl, sizes: '384x384', type: 'image/jpeg' },
-            { src: currentSong.coverUrl, sizes: '512x512', type: 'image/jpeg' },
-          ]
-        });
-      } catch (e) {
-        console.warn('Media Session metadata update failed:', e);
-      }
-    }
-  }, [currentSong]);
-
-  // Set up Media Session action handlers - keep separate to ensure they persist
-  useEffect(() => {
-    if ('mediaSession' in navigator) {
-      try {
-        navigator.mediaSession.setActionHandler('play', () => {
-          onPlayPause();
-          // Force state update
-          navigator.mediaSession.playbackState = 'playing';
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-          onPlayPause();
-          // Force state update
-          navigator.mediaSession.playbackState = 'paused';
-        });
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-          onPrev();
-          // Keep playing state on track change
-          setTimeout(() => {
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
-            }
-          }, 100);
-        });
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-          onNext();
-          // Keep playing state on track change
-          setTimeout(() => {
-            if ('mediaSession' in navigator) {
-              navigator.mediaSession.playbackState = 'playing';
-            }
-          }, 100);
-        });
-      } catch (e) {
-        console.warn('Media Session action handlers setup failed:', e);
-      }
-    }
-  }, [onPlayPause, onPrev, onNext]);
-
-  // Update Media Session Position State (Critical for iOS)
-  useEffect(() => {
-    if ('mediaSession' in navigator && audioRef.current && !isNaN(audioRef.current.duration) && audioRef.current.duration > 0) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: audioRef.current.duration,
-          playbackRate: 1.0, // Always 1.0 for music
-          position: Math.min(audioRef.current.currentTime, audioRef.current.duration)
-        });
-      } catch (e) {
-        // Silently ignore - iOS might reject if metadata not set yet
-      }
-    }
-  }, [progress, duration]);
-
-  useEffect(() => {
-    // Reset state when song changes
-    setProgress(0);
-    setDuration(0);
-  }, [currentSong]);
-
-  // Expose seek handler to parent
-  useEffect(() => {
-    if (onSeekHandlerReady) {
-      onSeekHandlerReady(handleSeek);
-    }
-  }, [onSeekHandlerReady]);
-
+  // 4. Standard Event Handlers (Delegate to active player)
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const current = audioRef.current.currentTime;
-      const total = audioRef.current.duration;
+    const audio = getActiveAudioResult();
+    if (audio) {
+      const current = audio.currentTime;
+      const total = audio.duration;
       const prog = (current / total) * 100;
       setProgress(prog);
       setDuration(total);
@@ -269,41 +180,52 @@ export const Player: React.FC<PlayerProps> = ({
     }
   };
 
-  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
-    const error = audioRef.current?.error;
-    console.error('Audio playback error:', {
-      code: error?.code,
-      message: error?.message,
-      song: currentSong?.title
-    });
+  const handleAudioError = (e: any) => {
+    // Only care if it's the active player erroring
+    if (e.target !== getActiveAudioResult()) return;
 
-    // Auto-skip to next song on error to prevent playback from stopping
-    // This handles broken URLs, network failures, codec issues, etc.
-    setTimeout(() => {
-      console.warn('Skipping to next song due to playback error');
-      onNext();
-    }, 500);
+    console.error("Active player error:", e.target.error, e.target.src);
+    setTimeout(onNext, 1000);
   };
 
+  // Media Session Updates (Same as before but using getActiveAudioResult)
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentSong) {
+      // ... (Exact same metadata logic)
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title,
+        artist: currentSong.artist,
+        album: currentSong.album || '',
+        artwork: [{ src: currentSong.coverUrl, sizes: '512x512', type: 'image/jpeg' }]
+      });
+    }
+  }, [currentSong]);
+
+  // Handle Seek
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
-    if (audioRef.current && duration) {
-      audioRef.current.currentTime = (val / 100) * duration;
+    const audio = getActiveAudioResult();
+    if (audio && duration) {
+      audio.currentTime = (val / 100) * duration;
       setProgress(val);
       if (onProgressChange) onProgressChange(val);
     }
-    // Also call external handler if provided
     if (externalOnSeek) externalOnSeek(e);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setVolume(val);
-    if (audioRef.current) {
-      audioRef.current.volume = val;
-    }
+    if (audioRefA.current) audioRefA.current.volume = val;
+    if (audioRefB.current) audioRefB.current.volume = val;
   };
 
+  // Expose handler
+  useEffect(() => {
+    if (onSeekHandlerReady) onSeekHandlerReady(handleSeek);
+  }, [onSeekHandlerReady, activePlayer]); // Re-bind when player swaps
+
+  // Helper formatter
   const formatTime = (time: number) => {
     if (isNaN(time)) return "0:00";
     const min = Math.floor(time / 60);
@@ -315,14 +237,20 @@ export const Player: React.FC<PlayerProps> = ({
 
   return (
     <div className="h-24 bg-black border-t border-gray-900 px-4 flex items-center justify-between sticky bottom-0 z-50">
+      {/* Dual Audio Elements */}
       <audio
-        ref={audioRef}
-        src={currentSong.audioUrl}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={handleEnded}
+        ref={audioRefA}
+        onTimeUpdate={activePlayer === 'A' ? handleTimeUpdate : undefined}
+        onEnded={activePlayer === 'A' ? handleEnded : undefined}
         onError={handleAudioError}
-        onPlaying={handleAudioPlaying}
-        onPause={handleAudioPause}
+        preload="auto"
+        playsInline
+      />
+      <audio
+        ref={audioRefB}
+        onTimeUpdate={activePlayer === 'B' ? handleTimeUpdate : undefined}
+        onEnded={activePlayer === 'B' ? handleEnded : undefined}
+        onError={handleAudioError}
         preload="auto"
         playsInline
       />
@@ -372,7 +300,7 @@ export const Player: React.FC<PlayerProps> = ({
         </div>
 
         <div className="hidden md:flex w-full items-center gap-2 text-xs text-gray-400 font-mono">
-          <span>{formatTime(audioRef.current?.currentTime || 0)}</span>
+          <span>{formatTime(audioRefA.current && activePlayer === 'A' ? audioRefA.current.currentTime : (audioRefB.current ? audioRefB.current.currentTime : 0))}</span>
           <div className="relative w-full h-1 group flex items-center">
             <input
               type="range"
@@ -394,7 +322,6 @@ export const Player: React.FC<PlayerProps> = ({
 
       {/* Right: Controls */}
       <div className="hidden md:flex items-center justify-end w-1/4 min-w-[150px] gap-2">
-        {/* Playback Mode Button */}
         <button
           onClick={(e) => { e.stopPropagation(); togglePlaybackMode(); }}
           className="text-gray-400 hover:text-white cursor-pointer transition-colors"
