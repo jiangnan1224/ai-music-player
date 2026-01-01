@@ -48,6 +48,10 @@ export const Player: React.FC<PlayerProps> = ({
   // Track which player is currently "Active" (playing the current song)
   const [activePlayer, setActivePlayer] = useState<'A' | 'B'>('A');
 
+  // Blob signature tracking to fix iOS race condition
+  // Maps a Blob URL to a Song ID to prevent React from resetting the src when it shouldn't
+  const blobSignatureRef = useRef<{ url: string; songId: string | number } | null>(null);
+
   // Blob storage for next song preloading
   const nextSongBlobUrlRef = useRef<string | null>(null);
 
@@ -62,22 +66,28 @@ export const Player: React.FC<PlayerProps> = ({
   // 1. Handle Song Loading (Ping-Pong Logic)
   useEffect(() => {
     // When currentSong changes, we need to decide if this is a "normal" load or a "gapless" transition.
-    // Ideally, the parent component calls onNext(), which updates currentSong.
-
-    // In a perfect gapless transition, the "inactive" player is ALREADY loaded with this song.
-    // So we just need to ensure the active player points to the right element.
-
-    // However, if the user clicked a random song (not next), we need to load it into the active player.
     const activeAudio = getActiveAudioResult();
     const inactiveAudio = getInactiveAudioResult();
 
     if (activeAudio && currentSong) {
-      // Check if active audio is already playing this URL (gapless case)
-      // Note: Blob URLs won't match the string URL, so we rely on the fact that handleEnded swapped the state
-      const isSrcMatch = activeAudio.src === currentSong.audioUrl || (nextSongBlobUrlRef.current && activeAudio.src === nextSongBlobUrlRef.current);
+      // Check if active audio is already playing this URL (gapless case).
+      // CRITICAL FIX: We must check if the current Blob signature matches the new song.
+      // If it matches, it means the Blob currently playing IS this song, just preloaded.
+      // In that case, we MUST NOT touch the src, otherwise iOS will stop playback.
+      const isExactMatch = activeAudio.src === currentSong.audioUrl;
+      const isSignatureMatch = blobSignatureRef.current &&
+        activeAudio.src === blobSignatureRef.current.url &&
+        String(currentSong.id) === String(blobSignatureRef.current.songId);
 
-      if (!isSrcMatch) {
-        // Normal load (User clicked a song)
+      if (isExactMatch || isSignatureMatch) {
+        console.log("Safe: Source match confirmed (Signature or Exact). Skipping reset for:", currentSong.title);
+        // Ensure it's playing if it should be
+        if (isPlaying && activeAudio.paused) {
+          activeAudio.play().catch(e => console.warn("Resume match error", e));
+        }
+      } else {
+        console.log("Load: New source required for:", currentSong.title);
+        // Normal load (User clicked a song, or no preload available)
         activeAudio.src = currentSong.audioUrl;
         if (isPlaying) {
           activeAudio.play().catch(e => console.warn("Play error", e));
@@ -98,9 +108,11 @@ export const Player: React.FC<PlayerProps> = ({
         .then(blob => {
           if (blob.size < 1000) return;
           const blobUrl = URL.createObjectURL(blob);
-          // Revoke old blob
+
+          // Revoke old blob and update signature
           if (nextSongBlobUrlRef.current) URL.revokeObjectURL(nextSongBlobUrlRef.current);
           nextSongBlobUrlRef.current = blobUrl;
+          blobSignatureRef.current = { url: blobUrl, songId: nextSong.id };
 
           // Load into inactive player
           inactiveAudio.src = blobUrl;
